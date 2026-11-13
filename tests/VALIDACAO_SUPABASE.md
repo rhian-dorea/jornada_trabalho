@@ -1,6 +1,6 @@
 # Matriz de validação após configurar o Supabase
 
-**Estado:** pendente. Este workspace não recebeu URL, chave nem contas de teste. Execute em projeto de homologação, registrando data e resultado real de cada item. Não use dados de produção.
+**Estado:** pendente. URL e chave publicável estão configuradas, mas as RPCs, políticas RLS e contas de teste ainda não foram verificadas em um projeto Supabase real. Execute em projeto de homologação, registrando data e resultado real de cada item. Não use dados de produção.
 
 ## Funcional e persistência
 
