@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle de Escalas e DSR</title>
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">📅</div><div><h1>Controle de Escalas e DSR</h1><p>Descanso semanal remunerado · dados sincronizados</p></div></div>
+  <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bCfg" hidden>⚙ Configurações</button><button id="bOut" hidden>Sair</button></div>
+</header>
+<main id="main" hidden>
+  <section class="kpis" id="kpis"></section>
+  <section class="alerts" id="alerts"></section>
+  <section class="panel">
+    <div class="bar">
+      <div class="tabs"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
+      <div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div>
+    </div>
+    <div id="view"></div>
+    <div class="lg"><span><i style="background:var(--tb)"></i>Trabalha (nº = dia seguido)</span><span><i style="background:var(--fb)"></i>Folga (DSR)</span><span><i style="background:var(--wkb)"></i>6º dia: folga no dia seguinte</span><span><i style="background:var(--dgb)"></i>Irregular (7º dia ou 2 domingos seguidos)</span><span><i style="background:#fff;border:1px dashed #f59e0b"></i>Folga obrigatória / domingo bloqueado (mulheres)</span><span>Clique em um dia para lançar.</span></div>
+  </section>
+</main>
+
+<div class="ov" id="ovDay"><div class="box" role="dialog" aria-modal="true" aria-labelledby="dT"><h2 id="dT"></h2><div id="dB"></div><div style="text-align:right;margin-top:12px"><button class="p" data-close="ovDay">Fechar</button></div></div></div>
+
+<div class="ov" id="ovCfg"><div class="box" role="dialog" aria-modal="true" aria-label="Configurações">
+  <h2>Configurações</h2>
+  <h3 id="fT">Adicionar funcionário</h3>
+  <div class="g"><div><label for="fN">Nome</label><input id="fN" maxlength="60"></div>
+  <div><label for="fS">Sexo</label><select id="fS"><option value="M">Homem</option><option value="F">Mulher</option></select></div>
+  <div><label for="fR">Cargo</label><input id="fR" maxlength="40"></div></div>
+  <div class="g"><div><label for="fM">Matrícula (opcional)</label><input id="fM" maxlength="80"></div><div><label for="fE">Equipe (opcional)</label><input id="fE" maxlength="80"></div><div><label for="fA">Situação</label><select id="fA"><option value="true">Ativo</option><option value="false">Desativado</option></select></div></div>
+  <div style="margin-top:10px;display:flex;gap:6px"><button class="p" id="bAdd">Adicionar</button><button id="bCan" hidden>Cancelar edição</button></div>
+  <h3>Funcionários</h3><div id="list"></div>
+  <h3>Regras aplicadas</h3>
+  <ul class="rules"><li>Máximo de 6 dias seguidos de trabalho (homens e mulheres); o 7º dia é bloqueado.</li><li>Mulheres: ao menos 1 domingo de folga a cada 2 domingos (art. 386 da CLT). Não é permitido trabalhar 2 domingos seguidos.</li><li>A sequência é conferida pelas datas, inclusive na virada de mês. Dia sem lançamento não conta como trabalhado.</li></ul>
+  <h3>Exportar registros (CSV)</h3><p>Inclui todo o histórico autorizado.</p><textarea id="csv" readonly aria-label="CSV para exportar"></textarea>
+  <div style="margin-top:6px"><button id="bExp">Preparar CSV</button><button id="bCp">Copiar</button><button id="bDownload">Baixar CSV</button></div>
+  <div id="adminTools">
+    <h3>Importar registros (CSV)</h3><textarea id="imp" placeholder="Funcionario;Sexo;Cargo;Data;Registro" aria-label="CSV para importar"></textarea>
+    <div style="margin-top:6px"><button id="bPreview">Prévia</button><button id="bImp" disabled>Confirmar importação</button></div><div id="importPreview" role="status"></div>
+    <h3>Migração do navegador</h3><label for="legacyFile">JSON de backup da origem antiga (opcional)</label><input id="legacyFile" type="file" accept=".json,application/json"><div id="migrationPreview" role="status"></div><button id="bBackup">Baixar backup</button><button id="bMigrate">Confirmar migração</button>
+    <h3>Auditoria</h3><button id="bAudit">Consultar alterações recentes</button><div id="auditView"></div>
+  </div>
+  <div style="text-align:right;margin-top:14px"><button class="p" data-close="ovCfg">Fechar</button></div>
+</div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="ov" id="ovLogin" style="display:flex"><form class="box" id="loginForm"><h2>Acessar Controle de Escalas</h2><p>Entre com sua conta autorizada.</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><div style="display:flex;gap:8px;margin-top:14px"><button class="p" type="submit" id="bLogin">Entrar</button><button type="button" id="bReset">Recuperar senha</button></div><p id="loginError" role="alert"></p></form></div>
+<div class="ov" id="ovPassword"><form class="box" id="passwordForm"><h2>Definir nova senha</h2><label for="newPassword">Nova senha</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" required><div style="margin-top:14px"><button class="p" type="submit">Salvar senha</button></div><p id="passwordError" role="alert"></p></form></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

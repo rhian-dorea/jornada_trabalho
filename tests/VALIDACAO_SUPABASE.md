@@ -1,0 +1,36 @@
+# Matriz de validação após configurar o Supabase
+
+**Estado:** pendente. Este workspace não recebeu URL, chave nem contas de teste. Execute em projeto de homologação, registrando data e resultado real de cada item. Não use dados de produção.
+
+## Funcional e persistência
+
+1. Administrador cria funcionário sem matrícula, edita nome/cargo/equipe, desativa e reativa. Confirme no Table Editor que o UUID permanece e `jornadas` antigas persistem.
+2. Registre trabalho, folga, corrija e remova um lançamento. Confira `auditoria` em cada mudança. Recarregue a página e abra outra sessão autorizada; os dados devem coincidir.
+3. Navegue entre mês, semana, virada de mês/ano e Hoje. Clique em Atualizar; abra a aba novamente depois de edição feita por outro usuário.
+4. Abra duas sessões com o mesmo registro. Mude em uma e tente salvar a versão antiga na outra: deve surgir conflito, sem sobrescrita.
+
+## Regras e concorrência
+
+1. Lance cinco dias seguidos: alerta. Lance sexto: destaque de limite. Tente sétimo: rejeição pelo banco.
+2. Repita a sequência cruzando o fim de mês e de ano. Tente inserir retroativamente um dia que une blocos e forma sete dias: rejeição.
+3. Em funcionária `F`, lance trabalho em domingos consecutivos de meses diferentes, nas duas ordens: segunda operação rejeitada.
+4. Em funcionário `M` com domingos consecutivos já lançados, tente mudar sexo para `F`: rejeição e sexo anterior preservado.
+5. Em duas sessões de gestores da mesma equipe, tente lançamentos simultâneos em datas diferentes que juntos formariam sete dias: no máximo uma operação deve confirmar.
+
+## RLS e API direta
+
+1. Sem token, consultas a `funcionarios`, `jornadas`, `perfis` e `auditoria` devem falhar ou retornar vazio.
+2. Com token de Visualização, `SELECT` deve mostrar apenas equipes atribuídas; RPCs de alteração devem falhar.
+3. Com token de Gestor da Equipe A, consultas e RPCs da Equipe B devem falhar. Gestor não pode editar `perfis`, `perfil_equipes`, `funcionarios` nem `auditoria` diretamente.
+4. Com token de usuário sem perfil ou perfil inativo, consultas operacionais e RPCs devem falhar.
+5. Tente `POST`/`PATCH` direto nas tabelas, inclusive `jornadas` e `perfis`: deve falhar por grant/RLS. Tente chamar `salvar_funcionario`, `importar_csv` e `migrar_local` com token sem perfil: deve falhar.
+6. Confira que a auditoria não pode ser editada/excluída via API.
+
+## CSV e migração
+
+1. Teste CSV válido, vazio, cabeçalho errado, linha incompleta, data impossível, linha repetida, campo malicioso `=...` e arquivo acima de 5000 linhas.
+2. Tente importar lote com uma linha que viola a regra: zero linhas devem ser persistidas. Repita importação válida: sem duplicação. Tente lançamento existente com situação diferente: rejeição.
+3. Migre JSON legado v2 e v1 após baixar backup. Verifique contagens, UUIDs e associação por ID. Repita: zero novos registros. Teste JSON com funcionário sem ID, data inválida, referência ausente e regra violada: rejeição total e armazenamento original intacto.
+4. Interrompa a rede durante importação; a interface não deve afirmar sucesso sem confirmação. Confira no banco se houve commit antes de repetir.
+
+Registre evidências do resultado real antes de declarar prontidão para produção.
