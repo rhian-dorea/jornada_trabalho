@@ -1,7 +1,7 @@
 import { db, configured, profile, employees, journeys, allJourneys, all, saveEmployee, saveJourney, importRows, migrateLocal } from './data.js';
 import { parseCSV, exportCSV } from './csv.js';
 import { readLegacy, parseLegacy, backup } from './migration.js';
-import { validateWork, assessWork, workRestrictions, workWarnings } from './rules.js';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -17,7 +17,7 @@ let S={emps:[],rec:{},versions:{},empVersions:{}};
 let user=null, role=null, mode='m', D=today(), busy=false, loadSeq=0, editId=null, preview=null, legacy=null, uploadedLegacy=null, migrationReport=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
-const restrictionsOn=(e,d)=>W(e.id,d)?[]:workRestrictions(e,d,W);
+const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W);
 const warningsOn=(e,d)=>workWarnings(e,d,W);
 function pos(id,d){let b=0;while(W(id,add(d,-b-1)))b++;return b+1}
 const check=(e,d)=>validateWork(e,d,W);
@@ -31,6 +31,8 @@ function info(e,d){
     return{c:'t',t:'Trabalho',detail:pos(e.id,d)+'º dia seguido'};
   }
   if(c==='F')return{c:'f',t:'Folga',detail:''};
+  const blocked=restrictionsOn(e,d);
+  if(blocked.length)return{c:'blocked',t:'Descanso necessário',detail:blocked.map(r=>r.short).join(' · ')};
   return{c:'z',t:'Sem lançamento',detail:''};
 }
 const visibleOn=d=>S.emps.filter(e=>e.ativo||st(e.id,d));
@@ -56,22 +58,27 @@ function render(){
       const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
       const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
       const warnings=workEntries.filter(x=>x.warnings.length).length;
-      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com trabalho bloqueado, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
-        +(working.length||off.length||blocked.length?dayGroup('Trabalho',workEntries,'work',3)+dayGroup('Folga',off,'off',2)+dayGroup('Trabalho bloqueado',blocked,'blocked',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
+      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
+        +(working.length||off.length||blocked.length?dayGroup('Trabalho',workEntries,'work',3)+dayGroup('Folga',off,'off',2)+dayGroup('Descanso necessário',blocked,'blocked',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
     const s0=add(D,-D.getDay()),s6=add(s0,6);from=s0;to=s6;
     $('#ttl').textContent=s0.getDate()+' '+MN[s0.getMonth()].slice(0,3)+' a '+s6.getDate()+' '+MN[s6.getMonth()].slice(0,3)+' '+s6.getFullYear();
     const weekEmps=S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean));
-    let h='<div class="sc"><table><tr><th class="nm">Funcionário</th>';
-    for(let i=0;i<7;i++){const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;h+='<th>'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span></th>'}
+    let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><tr><th class="nm">Funcionário</th>';
+    for(let i=0;i<7;i++){
+      const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
+      const off=weekEmps.filter(e=>st(e.id,d)==='F').length;
+      const blocked=weekEmps.filter(e=>restrictionsOn(e,d).length>0).length;
+      h+='<th class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(off?'<span class="th-off">'+off+' folga'+(off===1?'':'s')+'</span>':'')+(blocked?'<span class="th-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+'</span>':'')+'</th>';
+    }
     h+='</tr>';
     if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário neste período.</td></tr>';
     weekEmps.forEach(e=>{
       h+='<tr><td class="nm"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></td>';
       for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
-        h+='<td class="c '+o.c+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail)+'</small>':'')+'</td>'}
+        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail)+'</small>':'')+'</td>'}
       h+='</tr>';
     });
     $('#view').innerHTML=h+'</table></div>';
@@ -117,7 +124,7 @@ async function refresh(){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
       versions[`${r.funcionario_id}|${r.data}`]=r.atualizado_em;
     }
-    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:e.cargo})),rec,versions,
+    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,
       empVersions:Object.fromEntries(emps.map(e=>[e.id,e.atualizado_em]))};
     render();if($('#ovCfg').style.display==='flex')cfg();
     if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
@@ -134,8 +141,12 @@ async function mutate(action,onError){
 async function setSt(id,ds,v){
   if(role==='visualizacao')return;
   const e=S.emps.find(x=>x.id===id);if(!e)return;
-  if(v==='T'&&st(id,fromKey(ds))!=='T'){
-    const message=check(e,fromKey(ds));if(message){toast(message);return}
+  const date=fromKey(ds);
+  if(v==='F'&&(restrictionsOn(e,date).length||st(id,date)==='T'&&warningsOn(e,date).length)){
+    toast('O aviso de descanso ou exceção já aparece na escala; não é necessário lançar Folga neste dia.');return;
+  }
+  if(v==='T'&&st(id,date)!=='T'){
+    const message=check(e,date);if(message){toast(message);return}
   }
   if(!v && st(id,fromKey(ds)) && !confirm(`Remover o lançamento de ${e.name} em ${ds}?`))return;
   await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
@@ -149,17 +160,18 @@ function renderDayRows(ds){
     if(!name.includes(query))return false;
     const c=st(e.id,d);
     return filter==='all'||filter==='work'&&c==='T'||filter==='off'&&c==='F'||
-      filter==='blocked'&&restrictionsOn(e,d).length>0||filter==='exception'&&c==='T'&&warningsOn(e,d).length>0||filter==='empty'&&!c;
+      filter==='blocked'&&restrictionsOn(e,d).length>0||filter==='exception'&&c==='T'&&warningsOn(e,d).length>0||filter==='empty'&&!c&&!restrictionsOn(e,d).length;
   }).sort((a,b)=>{
     const rank=e=>st(e.id,d)==='T'?0:st(e.id,d)==='F'?1:2;
     return rank(a)-rank(b)||a.name.localeCompare(b.name,'pt-BR');
   });
   $('#dB').innerHTML=emps.length?emps.map(e=>{
     const c=st(e.id,d),o=info(e,d),reasons=restrictionsOn(e,d),warnings=c==='T'?warningsOn(e,d):[],bl=reasons[0]?.message||'',can=role!=='visualizacao'&&(e.ativo||c&&role==='administrador');
+    const noOff=reasons.length>0||warnings.length>0;
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
-    const restriction=reasons.length?'<small class="rule-note">Trabalho bloqueado: '+esc(reasons.map(r=>r.short).join(' · '))+'</small>':'';
+    const restriction=reasons.length?'<small class="rule-note">Descanso necessário: '+esc(reasons.map(r=>r.short).join(' · '))+'</small>':'';
     const warning=warnings.length?'<small class="rule-warning">Aviso: '+esc(warnings.map(r=>r.short).join(' · '))+'</small>':'';
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
   }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
 }
 function openDay(ds,selectedId){
@@ -171,7 +183,7 @@ function openDay(ds,selectedId){
   $('#dT').textContent=WD[d.getDay()]+', '+d.toLocaleDateString('pt-BR');
   const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length,blocked=emps.filter(e=>restrictionsOn(e,d).length).length;
   const warnings=emps.filter(e=>st(e.id,d)==='T'&&warningsOn(e,d).length).length;
-  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' com trabalho bloqueado</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
+  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off-blocked)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+' necessário'+(blocked===1?'':'s')+'</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
   $('#dB').dataset.d=ds;renderDayRows(ds);$('#ovDay').style.display='flex';
   if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"][data-s="T"]:not(:disabled)')||$('#dB [data-e="'+selectedId+'"][data-s="F"]:not(:disabled)'):null;(selected||$('#dSearch')).focus()}
 }
@@ -234,14 +246,14 @@ $('#fR').addEventListener('change',()=>{updateOtherRoleVisibility();if(!$('#othe
 $('#list').addEventListener('click',ev=>{
   const b=ev.target.closest('[data-ed]');if(!b||role!=='administrador')return;
   const e=S.emps.find(x=>x.id===b.dataset.ed);if(!e)return;
-  editId=e.id;$('#fN').value=e.nome;$('#fS').value=e.sexo;selectRole(e.cargo||'');
+  editId=e.id;$('#fN').value=e.nome;$('#fS').value=e.sexo;selectRole(canonicalRole(e.cargo));
   $('#fM').value=e.matricula||'';$('#fE').value=e.equipe||'';$('#fA').value=String(e.ativo);
   $('#bAdd').textContent='Salvar alterações';$('#fT').textContent='Editar funcionário';$('#bCan').hidden=false;$('#fN').focus();
 });
 $('#bAdd').onclick=async()=>{
   const name=$('#fN').value.trim(),active=$('#fA').value==='true';
   if(!name){toast('Informe o nome.');return}
-  const cargo=$('#fR').value==='__other__'?$('#fROther').value.trim():$('#fR').value;
+  const cargo=canonicalRole($('#fR').value==='__other__'?$('#fROther').value:$('#fR').value);
   if($('#fR').value==='__other__'&&!cargo){toast('Informe o novo cargo.');return}
   if(cargo.length>40){toast('O cargo deve ter até 40 caracteres.');return}
   if(editId&&!active&&S.emps.find(e=>e.id===editId)?.ativo&&!confirm(`Desativar ${name}? O histórico será preservado.`))return;
@@ -255,7 +267,7 @@ async function prepareExport(){
   const seq=loadSeq;
   setSync('Preparando CSV…');
   try{const rows=await allJourneys();if(!user||role==='visualizacao'||seq!==loadSeq)return;
-    $('#csv').value=exportCSV(S.emps,rows);setSync('CSV preparado');toast('CSV preparado.',true)}
+    $('#csv').value=exportCSV(S.emps.map(e=>({...e,cargo:e.role})),rows);setSync('CSV preparado');toast('CSV preparado.',true)}
   catch(error){setSync('Falha na exportação',true);toast(explain(error))}
 }
 $('#bExp').onclick=prepareExport;
@@ -278,7 +290,7 @@ $('#bImp').onclick=async()=>{
   if(!preview||preview.errors.length||!preview.rows.length||role!=='administrador')return;
   if(!confirm(`Importar ${preview.rows.length} linha(s)? A operação será integral.`))return;
   await mutate(async()=>{
-    const result=await importRows(preview.rows);
+    const result=await importRows(preview.rows.map(row=>({...row,cargo:canonicalRole(row.cargo)})));
     $('#importPreview').textContent=`Importação concluída: ${result.linhas} linha(s), ${result.funcionarios_novos} funcionário(s) novo(s).`;
     $('#imp').value='';preview=null;$('#bImp').disabled=true;
   },error=>{$('#importPreview').textContent=`Lote rejeitado sem alterações: ${explain(error)}`});
@@ -292,7 +304,7 @@ $('#bBackup').onclick=()=>{if(legacy){backup(legacy);backupDone=true;backupRaw=l
 $('#bMigrate').onclick=async()=>{
   if(!legacy||!backupDone||backupRaw!==legacy.raw||legacy.errors.length||role!=='administrador')return;
   if(!confirm(`Migrar ${legacy.emps.length} funcionário(s) e ${legacy.journeys.length} lançamento(s)? O armazenamento original será preservado.`))return;
-  await mutate(async()=>{const result=await migrateLocal(legacy.origin,legacy.emps,legacy.journeys);
+  await mutate(async()=>{const result=await migrateLocal(legacy.origin,legacy.emps.map(e=>({...e,cargo:canonicalRole(e.cargo)})),legacy.journeys);
     migrationReport=`Migração concluída: ${result.funcionarios_novos} funcionário(s) e ${result.jornadas_novas} jornada(s) novos. Dados locais preservados.`;
     $('#migrationPreview').textContent=migrationReport;
   },error=>{migrationReport=`Lote rejeitado sem alterações: ${explain(error)}`;$('#migrationPreview').textContent=migrationReport});

@@ -1,10 +1,16 @@
 const next = (date, days) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 const label = date => `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}`;
-const specialTitles = new Set(['supervisor', 'supervisora', 'coordenador', 'coordenadora', 'coodenador', 'coodenadora']);
+const normalizedTitle = value => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+
+export function canonicalRole(value) {
+  const title = normalizedTitle(value);
+  if (['supervisor', 'supervisora'].includes(title)) return 'Supervisor';
+  if (['coordenador', 'coordenadora', 'coodenador', 'coodenadora'].includes(title)) return 'Coordenador';
+  return String(value ?? '').trim();
+}
 
 export function hasExtendedSchedule(employee) {
-  const title = String(employee.role ?? employee.cargo ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
-  return specialTitles.has(title);
+  return ['Supervisor', 'Coordenador'].includes(canonicalRole(employee.role ?? employee.cargo));
 }
 
 // Pré-validação visual. O PostgreSQL aplica a validação definitiva na transação.

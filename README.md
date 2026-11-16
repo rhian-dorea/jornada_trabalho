@@ -8,7 +8,7 @@ Aplicação estática baseada no arquivo original `Controle_de_Escalas_e_DSR.htm
 - `js/app.js`, `js/rules.js`: calendário, interações e pré-validação visual.
 - `js/data.js`, `js/config.js`: acesso ao Supabase e configuração pública.
 - `js/csv.js`, `js/migration.js`: CSV e migração local com backup.
-- `sql/001_schema.sql`, `002_security.sql`, `003_business_rules.sql`, `004_cargos_excecoes.sql`: banco, RLS e operações transacionais. Execute nessa ordem. Em instalações existentes, execute apenas o novo `004`.
+- `sql/001_schema.sql` até `005_normalizar_cargos.sql`: banco, RLS, operações transacionais e padronização dos cargos. Execute nessa ordem. Em instalações existentes, execute os scripts novos que ainda faltam.
 - `tests/frontend.test.mjs`: testes locais do navegador e regras em JavaScript.
 - `docs/`: arquitetura, regras, configuração e implantação.
 - `Controle_de_Escalas_e_DSR.html`: arquivo original preservado apenas localmente e ignorado pelo Git porque contém registros de demonstração.

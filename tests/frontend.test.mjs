@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateWork, workWarnings, hasExtendedSchedule } from '../js/rules.js';
+import { validateWork, workWarnings, hasExtendedSchedule, canonicalRole } from '../js/rules.js';
 import { parseCSV, exportCSV } from '../js/csv.js';
 import { readLegacy } from '../js/migration.js';
 
@@ -36,8 +36,8 @@ test('supervisor pode o sétimo dia com aviso vermelho, mas não o oitavo', () =
   assert.equal(workWarnings(supervisor,date('2026-11-07'),work(days))[0].short,'7º dia seguido');
   assert.match(validateWork(supervisor,date('2026-11-08'),work(days)),/8 dias/);
 });
-test('coordenadora pode dois domingos com aviso, mas não três', () => {
-  const coordinator={...emp,role:'Coordenadora'};
+test('coordenador pode dois domingos com aviso, mas não três', () => {
+  const coordinator={...emp,role:'Coordenador'};
   const days=new Set(['2026-11-01']);
   assert.equal(validateWork(coordinator,date('2026-11-08'),work(days)),'');
   assert.equal(workWarnings(coordinator,date('2026-11-08'),work(days))[0].short,'2 domingos seguidos');
@@ -48,6 +48,13 @@ test('coordenadora pode dois domingos com aviso, mas não três', () => {
   assert.match(validateWork({...coordinator,sex:'M'},date('2026-11-08'),work(new Set(['2026-11-01','2026-11-15']))),/3 domingos/);
   assert.equal(hasExtendedSchedule({...emp,role:'Coodenador'}),true);
   assert.equal(hasExtendedSchedule({...emp,role:'Analista'}),false);
+});
+test('cargos antigos são exibidos com nomes masculinos únicos', () => {
+  assert.equal(canonicalRole('Supervisora'), 'Supervisor');
+  assert.equal(canonicalRole('coodenadora'), 'Coordenador');
+  assert.equal(canonicalRole('Coordenador'), 'Coordenador');
+  assert.equal(canonicalRole('Analista'), 'Analista');
+  assert.equal(hasExtendedSchedule({...emp,role:'Supervisora'}), true);
 });
 test('CSV valida datas, duplicidade e colunas', () => {
   const parsed = parseCSV('Funcionario;Sexo;Cargo;Data;Registro\nAna;Mulher;A;31/02/2026;Trabalho\nAna;Mulher;A;01/11/2026;Trabalho\nAna;Mulher;A;01/11/2026;Trabalho\nX;Homem');
