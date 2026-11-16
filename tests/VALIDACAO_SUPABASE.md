@@ -16,6 +16,8 @@
 3. Em funcionária `F`, lance trabalho em domingos consecutivos de meses diferentes, nas duas ordens: segunda operação rejeitada.
 4. Em funcionário `M` com domingos consecutivos já lançados, tente mudar sexo para `F`: rejeição e sexo anterior preservado.
 5. Em duas sessões de gestores da mesma equipe, tente lançamentos simultâneos em datas diferentes que juntos formariam sete dias: no máximo uma operação deve confirmar.
+6. Em Supervisor e Coordenador, lance o sétimo dia seguido e o segundo domingo: as operações devem confirmar e aparecer em vermelho com os motivos. Tente o oitavo dia e o terceiro domingo consecutivo: o banco deve rejeitar.
+7. Com sete dias ou dois domingos já lançados em cargo de exceção, tente trocar para cargo comum: a atualização deve ser rejeitada, sem mudar o cadastro. Confira nomes e motivos na visão mensal e no filtro do dia.
 
 ## RLS e API direta
 

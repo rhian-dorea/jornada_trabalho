@@ -8,7 +8,7 @@ Aplicação estática baseada no arquivo original `Controle_de_Escalas_e_DSR.htm
 - `js/app.js`, `js/rules.js`: calendário, interações e pré-validação visual.
 - `js/data.js`, `js/config.js`: acesso ao Supabase e configuração pública.
 - `js/csv.js`, `js/migration.js`: CSV e migração local com backup.
-- `sql/001_schema.sql`, `002_security.sql`, `003_business_rules.sql`: banco, RLS e operações transacionais. Execute nessa ordem.
+- `sql/001_schema.sql`, `002_security.sql`, `003_business_rules.sql`, `004_cargos_excecoes.sql`: banco, RLS e operações transacionais. Execute nessa ordem. Em instalações existentes, execute apenas o novo `004`.
 - `tests/frontend.test.mjs`: testes locais do navegador e regras em JavaScript.
 - `docs/`: arquitetura, regras, configuração e implantação.
 - `Controle_de_Escalas_e_DSR.html`: arquivo original preservado apenas localmente e ignorado pelo Git porque contém registros de demonstração.
@@ -24,6 +24,6 @@ Para publicar no GitHub Pages, siga [IMPLANTACAO.md](docs/IMPLANTACAO.md). O ser
 
 ## Perfis
 
-Administrador consulta e altera todos os funcionários e jornadas, importa CSV e consulta auditoria. Gestor consulta e altera jornadas das equipes atribuídas. Visualização só consulta as equipes atribuídas. Funcionários sem equipe aparecem apenas ao administrador, até serem atribuídos a uma equipe.
+Administrador consulta e altera todos os funcionários e jornadas, importa CSV e consulta auditoria. Gestor consulta e altera jornadas das equipes atribuídas. Visualização só consulta as equipes atribuídas. Funcionários sem equipe aparecem apenas ao administrador, até serem atribuídos a uma equipe. O cadastro oferece Despachante, Supervisor, Coordenador e Analista, com opção de criar outros cargos.
 
 As validações de seis dias e domingos são regras operacionais deste sistema; não substituem uma análise completa de conformidade trabalhista.

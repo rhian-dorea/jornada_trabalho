@@ -1,7 +1,7 @@
 import { db, configured, profile, employees, journeys, allJourneys, all, saveEmployee, saveJourney, importRows, migrateLocal } from './data.js';
 import { parseCSV, exportCSV } from './csv.js';
 import { readLegacy, parseLegacy, backup } from './migration.js';
-import { validateWork } from './rules.js';
+import { validateWork, assessWork, workRestrictions, workWarnings } from './rules.js';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -17,21 +17,29 @@ let S={emps:[],rec:{},versions:{},empVersions:{}};
 let user=null, role=null, mode='m', D=today(), busy=false, loadSeq=0, editId=null, preview=null, legacy=null, uploadedLegacy=null, migrationReport=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
+const restrictionsOn=(e,d)=>W(e.id,d)?[]:workRestrictions(e,d,W);
+const warningsOn=(e,d)=>workWarnings(e,d,W);
 function pos(id,d){let b=0;while(W(id,add(d,-b-1)))b++;return b+1}
-function sunV(e,d){return e.sex==='F'&&d.getDay()===0&&W(e.id,d)&&(W(e.id,add(d,-7))||W(e.id,add(d,7)))}
 const check=(e,d)=>validateWork(e,d,W);
 function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)':'';t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5200)}
 function info(e,d){
   const c=st(e.id,d);
-  if(c==='T'){const p=pos(e.id,d),sv=sunV(e,d);
-    return{c:p>=7||sv?'bad':'t',t:'Trabalho',detail:sv?'Domingos consecutivos':p+'º dia seguido'}}
+  if(c==='T'){
+    const assessment=assessWork(e,d,W);
+    if(assessment.restrictions.length)return{c:'bad',t:'Trabalho',detail:assessment.restrictions.map(r=>r.short).join(' · ')};
+    if(assessment.warnings.length)return{c:'exception',t:'Trabalho',detail:assessment.warnings.map(r=>r.short).join(' · ')};
+    return{c:'t',t:'Trabalho',detail:pos(e.id,d)+'º dia seguido'};
+  }
   if(c==='F')return{c:'f',t:'Folga',detail:''};
   return{c:'z',t:'Sem lançamento',detail:''};
 }
 const visibleOn=d=>S.emps.filter(e=>e.ativo||st(e.id,d));
 function dayGroup(label,list,css,limit){
   if(!list.length)return '';
-  const chips=list.slice(0,limit).map(e=>'<span class="person-chip" title="'+esc(e.name)+'">'+esc(e.name)+'</span>').join('');
+  const chips=list.slice(0,limit).map(item=>{
+    const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · ');
+    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" title="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(reason?'<em>'+esc(reason)+'</em>':'')+'</span>';
+  }).join('');
   const remaining=list.length-limit;
   const extra=remaining>0?'<span class="more-count">+'+remaining+' '+(remaining===1?'pessoa':'pessoas')+'</span>':'';
   return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+extra+'</div></div>';
@@ -45,8 +53,11 @@ function render(){
     for(let i=0;i<wks*7;i++){
       const d=add(f,i-f.getDay());
       const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
-      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
-        +(working.length||off.length?dayGroup('Trabalho',working,'work',3)+dayGroup('Folga',off,'off',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
+      const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
+      const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
+      const warnings=workEntries.filter(x=>x.warnings.length).length;
+      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com trabalho bloqueado, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
+        +(working.length||off.length||blocked.length?dayGroup('Trabalho',workEntries,'work',3)+dayGroup('Folga',off,'off',2)+dayGroup('Trabalho bloqueado',blocked,'blocked',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
@@ -69,12 +80,10 @@ function render(){
   /* Somente irregularidades reais permanecem visíveis; a validação continua no banco. */
   const A=[];
   S.emps.forEach(e=>{for(let d=from;+d<=+to;d=add(d,1)){
-    if(!W(e.id,d))continue;const p=pos(e.id,d);
-    if(p>=7)A.push('<b>'+esc(e.name)+'</b>: '+p+' dias seguidos de trabalho em '+fd(d)+'. Revise a escala.');
-    if(sunV(e,d)&&W(e.id,add(d,7)))A.push('<b>'+esc(e.name)+'</b>: dois domingos consecutivos de trabalho ('+fd(d)+' e '+fd(add(d,7))+').');
+    if(!W(e.id,d))continue;
+    const issues=workRestrictions(e,d,W);
+    if(issues.length)A.push('<b>'+esc(e.name)+'</b> em '+fd(d)+': '+esc(issues.map(r=>r.short).join(' · '))+'. Revise a escala.');
   }});
-  const active=S.emps.filter(e=>e.ativo),wk=S.emps.filter(e=>W(e.id,t)).length,fo=S.emps.filter(e=>st(e.id,t)==='F').length,empty=active.filter(e=>!st(e.id,t)).length;
-  $('#kpis').innerHTML=[['Funcionários ativos',active.length,'staff'],['Trabalham hoje',wk,'work'],['De folga hoje',fo,'off'],['Sem lançamento hoje',empty,'pending']].map(k=>'<div class="kpi '+k[2]+'"><b>'+k[1]+'</b><span>'+k[0]+'</span></div>').join('');
   $('#alerts').innerHTML=A.length?'<div class="d"><strong>Escalas para revisar</strong> · '+A.slice(0,5).join(' · ')+(A.length>5?' · +'+(A.length-5)+' outra(s)':'')+'</div>':'';
 }
 
@@ -84,7 +93,7 @@ function bounds(){
     const f=new Date(D.getFullYear(),D.getMonth(),1), e=new Date(D.getFullYear(),D.getMonth()+1,0);
     first=add(f,-f.getDay());last=add(e,6-e.getDay());
   }else{first=add(D,-D.getDay());last=add(first,6)}
-  return [key(add(first,-7)),key(add(last,7))];
+  return [key(add(first,-14)),key(add(last,14))];
 }
 function setSync(message,error=false){$('#sync').textContent=message;$('#sync').classList.toggle('error',error)}
 function explain(error){
@@ -98,17 +107,13 @@ async function refresh(){
   if(!user)return;
   const seq=++loadSeq,[start,end]=bounds();setSync('Carregando…');
   try{
-    const [emps,records,todayRows,p]=await Promise.all([
-      employees(),journeys(start,end),
-      key(today())<start||key(today())>end ? journeys(key(today()),key(today())) : Promise.resolve([]),
-      profile(user.id)
-    ]);
+    const [emps,records,p]=await Promise.all([employees(),journeys(start,end),profile(user.id)]);
     if(seq!==loadSeq)return;
     if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovCfg').style.display='none';$('#ovDay').style.display='none';$('#main').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
     $('#csv').value='';$('#auditView').textContent='';
     role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
     const rec={},versions={};
-    for(const r of [...records,...todayRows]){
+    for(const r of records){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
       versions[`${r.funcionario_id}|${r.data}`]=r.atualizado_em;
     }
@@ -136,29 +141,46 @@ async function setSt(id,ds,v){
   await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
     p_versao:S.versions[`${id}|${ds}`]??null}));
 }
-function openDay(ds,selectedId){
+function renderDayRows(ds){
   if(!ds)return;
-  const opening=$('#ovDay').style.display!=='flex';
-  if(opening)modalReturnFocus=document.activeElement;
-  const d=fromKey(ds);$('#dT').textContent=WD[d.getDay()]+', '+d.toLocaleDateString('pt-BR');
-  const emps=visibleOn(d).sort((a,b)=>{
+  const d=fromKey(ds),query=$('#dSearch').value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR'),filter=$('#dFilter').value;
+  const emps=visibleOn(d).filter(e=>{
+    const name=e.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+    if(!name.includes(query))return false;
+    const c=st(e.id,d);
+    return filter==='all'||filter==='work'&&c==='T'||filter==='off'&&c==='F'||
+      filter==='blocked'&&restrictionsOn(e,d).length>0||filter==='exception'&&c==='T'&&warningsOn(e,d).length>0||filter==='empty'&&!c;
+  }).sort((a,b)=>{
     const rank=e=>st(e.id,d)==='T'?0:st(e.id,d)==='F'?1:2;
     return rank(a)-rank(b)||a.name.localeCompare(b.name,'pt-BR');
   });
-  const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length;
-  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off)+' sem lançamento</span>';
   $('#dB').innerHTML=emps.length?emps.map(e=>{
-    const c=st(e.id,d),o=info(e,d),bl=c!=='T'?check(e,d):'',can=role!=='visualizacao'&&(e.ativo||c&&role==='administrador');
+    const c=st(e.id,d),o=info(e,d),reasons=restrictionsOn(e,d),warnings=c==='T'?warningsOn(e,d):[],bl=reasons[0]?.message||'',can=role!=='visualizacao'&&(e.ativo||c&&role==='administrador');
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small></span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
-  }).join(''):'<div class="empty">Nenhum funcionário neste dia.</div>';
-  $('#dB').dataset.d=ds;$('#ovDay').style.display='flex';
-  if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"]:not(:disabled)'):null;(selected||$('#dB button:not(:disabled)')||$('#ovDay [data-close]')).focus()}
+    const restriction=reasons.length?'<small class="rule-note">Trabalho bloqueado: '+esc(reasons.map(r=>r.short).join(' · '))+'</small>':'';
+    const warning=warnings.length?'<small class="rule-warning">Aviso: '+esc(warnings.map(r=>r.short).join(' · '))+'</small>':'';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+  }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
+}
+function openDay(ds,selectedId){
+  if(!ds)return;
+  const opening=$('#ovDay').style.display!=='flex',newDay=$('#dB').dataset.d!==ds;
+  if(opening)modalReturnFocus=document.activeElement;
+  if(newDay){$('#dSearch').value='';$('#dFilter').value='all'}
+  const d=fromKey(ds),emps=visibleOn(d);
+  $('#dT').textContent=WD[d.getDay()]+', '+d.toLocaleDateString('pt-BR');
+  const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length,blocked=emps.filter(e=>restrictionsOn(e,d).length).length;
+  const warnings=emps.filter(e=>st(e.id,d)==='T'&&warningsOn(e,d).length).length;
+  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' com trabalho bloqueado</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
+  $('#dB').dataset.d=ds;renderDayRows(ds);$('#ovDay').style.display='flex';
+  if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"][data-s="T"]:not(:disabled)')||$('#dB [data-e="'+selectedId+'"][data-s="F"]:not(:disabled)'):null;(selected||$('#dSearch')).focus()}
 }
 function cfg(){
+  populateRoleOptions();
   $('#list').innerHTML=S.emps.length?S.emps.map(e=>'<div class="li '+(e.ativo?'':'inactive')+'"><span><b>'+esc(e.name)+'</b> · '+(e.sex==='F'?'Mulher':'Homem')+(e.role?' · '+esc(e.role):'')+(e.equipe?' · '+esc(e.equipe):'')+(e.ativo?'':' · desativado')+'</span>'+(role==='administrador'?'<button data-ed="'+e.id+'">Editar</button>':'')+'</div>').join(''):'<div class="empty">Nenhum funcionário.</div>';
   $('#fT').hidden=role!=='administrador';$('#bAdd').hidden=role!=='administrador';
   document.querySelectorAll('#ovCfg .g').forEach(el=>el.hidden=role!=='administrador');
+  updateOtherRoleVisibility();
   $('#adminTools').hidden=role!=='administrador';
   $('#bExp').disabled=role==='visualizacao';$('#bCp').disabled=role==='visualizacao';$('#bDownload').disabled=role==='visualizacao';
   try{
@@ -170,7 +192,26 @@ function cfg(){
   }catch(error){legacy=null;$('#migrationPreview').textContent=explain(error);$('#bBackup').disabled=true;$('#bMigrate').disabled=true}
 }
 let backupDone=false,backupRaw=null;
-function resetForm(){editId=null;for(const id of ['fN','fR','fM','fE'])$('#'+id).value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true}
+const defaultRoles=['Despachante','Supervisor','Coordenador','Analista'];
+function populateRoleOptions(){
+  const select=$('#fR'),current=select.value;
+  const extra=[...new Set(S.emps.map(e=>e.role).filter(Boolean))]
+    .filter(name=>!defaultRoles.some(base=>base.toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  select.replaceChildren(new Option('Selecione',''),...defaultRoles.map(name=>new Option(name,name)),
+    ...extra.map(name=>new Option(name,name)),new Option('+ Adicionar outro cargo','__other__'));
+  select.value=current;
+}
+function updateOtherRoleVisibility(){
+  $('#otherRoleWrap').hidden=role!=='administrador'||$('#fR').value!=='__other__';
+}
+function selectRole(value){
+  populateRoleOptions();
+  if([...$('#fR').options].some(option=>option.value===value))$('#fR').value=value;
+  else{$('#fR').value='__other__';$('#fROther').value=value}
+  updateOtherRoleVisibility();
+}
+function resetForm(){editId=null;for(const id of ['fN','fM','fE','fROther'])$('#'+id).value='';$('#fR').value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true;updateOtherRoleVisibility()}
 
 $('#view').addEventListener('click',ev=>{
   const c=ev.target.closest('[data-e]'),dy=ev.target.closest('[data-day]');
@@ -179,6 +220,8 @@ $('#view').addEventListener('click',ev=>{
 });
 $('#view').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('[data-day],[data-e]')){ev.preventDefault();ev.target.click()}});
 $('#dB').addEventListener('click',ev=>{const b=ev.target.closest('[data-s]');if(b&&!b.disabled)setSt(b.dataset.e,$('#dB').dataset.d,b.dataset.s)});
+$('#dSearch').addEventListener('input',()=>renderDayRows($('#dB').dataset.d));
+$('#dFilter').addEventListener('change',()=>renderDayRows($('#dB').dataset.d));
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{$('#'+b.dataset.close).style.display='none';modalReturnFocus?.focus()});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){for(const id of ['ovDay','ovCfg'])if($('#'+id).style.display==='flex'){$('#'+id).style.display='none';modalReturnFocus?.focus();break}}});
 $('#tM').onclick=()=>{mode='m';refresh()};$('#tW').onclick=()=>{mode='w';refresh()};
@@ -187,18 +230,22 @@ $('#nx').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()+1,1):ad
 $('#td').onclick=()=>{D=today();refresh()};$('#bReload').onclick=refresh;
 $('#bCfg').onclick=()=>{modalReturnFocus=document.activeElement;cfg();$('#ovCfg').style.display='flex';(role==='administrador'?$('#fN'):$('#ovCfg [data-close="ovCfg"]')).focus()};
 $('#bCan').onclick=resetForm;
+$('#fR').addEventListener('change',()=>{updateOtherRoleVisibility();if(!$('#otherRoleWrap').hidden)$('#fROther').focus()});
 $('#list').addEventListener('click',ev=>{
   const b=ev.target.closest('[data-ed]');if(!b||role!=='administrador')return;
   const e=S.emps.find(x=>x.id===b.dataset.ed);if(!e)return;
-  editId=e.id;$('#fN').value=e.nome;$('#fS').value=e.sexo;$('#fR').value=e.cargo||'';
+  editId=e.id;$('#fN').value=e.nome;$('#fS').value=e.sexo;selectRole(e.cargo||'');
   $('#fM').value=e.matricula||'';$('#fE').value=e.equipe||'';$('#fA').value=String(e.ativo);
   $('#bAdd').textContent='Salvar alterações';$('#fT').textContent='Editar funcionário';$('#bCan').hidden=false;$('#fN').focus();
 });
 $('#bAdd').onclick=async()=>{
   const name=$('#fN').value.trim(),active=$('#fA').value==='true';
   if(!name){toast('Informe o nome.');return}
+  const cargo=$('#fR').value==='__other__'?$('#fROther').value.trim():$('#fR').value;
+  if($('#fR').value==='__other__'&&!cargo){toast('Informe o novo cargo.');return}
+  if(cargo.length>40){toast('O cargo deve ter até 40 caracteres.');return}
   if(editId&&!active&&S.emps.find(e=>e.id===editId)?.ativo&&!confirm(`Desativar ${name}? O histórico será preservado.`))return;
-  const payload={p_id:editId,p_nome:name,p_sexo:$('#fS').value,p_cargo:$('#fR').value.trim(),
+  const payload={p_id:editId,p_nome:name,p_sexo:$('#fS').value,p_cargo:cargo,
     p_matricula:$('#fM').value.trim()||null,p_equipe:$('#fE').value.trim()||null,p_ativo:active,
     p_versao:editId?S.empVersions[editId]:null};
   await mutate(async()=>{await saveEmployee(payload);resetForm()});
