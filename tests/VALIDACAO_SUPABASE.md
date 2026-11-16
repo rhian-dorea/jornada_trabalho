@@ -11,7 +11,7 @@
 
 ## Regras e concorrência
 
-1. Lance cinco dias seguidos: alerta. Lance sexto: destaque de limite. Tente sétimo: rejeição pelo banco.
+1. Lance cinco e seis dias seguidos: os lançamentos aparecem normalmente, sem avisos amarelos. Tente sétimo: rejeição pelo banco.
 2. Repita a sequência cruzando o fim de mês e de ano. Tente inserir retroativamente um dia que une blocos e forma sete dias: rejeição.
 3. Em funcionária `F`, lance trabalho em domingos consecutivos de meses diferentes, nas duas ordens: segunda operação rejeitada.
 4. Em funcionário `M` com domingos consecutivos já lançados, tente mudar sexo para `F`: rejeição e sexo anterior preservado.

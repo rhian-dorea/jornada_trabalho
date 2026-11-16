@@ -12,19 +12,22 @@
   <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bCfg" hidden>⚙ Configurações</button><button id="bOut" hidden>Sair</button></div>
 </header>
 <main id="main" hidden>
-  <section class="kpis" id="kpis"></section>
-  <section class="alerts" id="alerts"></section>
-  <section class="panel">
+  <section class="overview" aria-label="Resumo do dia">
+    <div class="section-intro"><span class="eyebrow">Visão geral</span><h2>Escala de hoje</h2><p>Um resumo rápido de quem trabalha e de quem está de folga.</p></div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+  <section class="alerts" id="alerts" aria-live="polite"></section>
+  <section class="panel schedule-panel">
     <div class="bar">
-      <div class="tabs"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
-      <div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div>
+      <div class="section-intro"><span class="eyebrow">Planejamento</span><h2>Calendário de trabalho</h2><p>Selecione um dia para registrar trabalho, folga ou remover um lançamento.</p></div>
+      <div class="tabs" role="group" aria-label="Modo de visualização"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
     </div>
+    <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="lg"><span><i class="legend-work"></i>Trabalho</span><span><i class="legend-off"></i>Folga</span><span><i class="legend-empty"></i>Sem lançamento</span></div></div>
     <div id="view"></div>
-    <div class="lg"><span><i style="background:var(--tb)"></i>Trabalha (nº = dia seguido)</span><span><i style="background:var(--fb)"></i>Folga (DSR)</span><span><i style="background:var(--wkb)"></i>6º dia: folga no dia seguinte</span><span><i style="background:var(--dgb)"></i>Irregular (7º dia ou 2 domingos seguidos)</span><span><i style="background:#fff;border:1px dashed #f59e0b"></i>Folga obrigatória / domingo bloqueado (mulheres)</span><span>Clique em um dia para lançar.</span></div>
   </section>
 </main>
 
-<div class="ov" id="ovDay"><div class="box" role="dialog" aria-modal="true" aria-labelledby="dT"><h2 id="dT"></h2><div id="dB"></div><div style="text-align:right;margin-top:12px"><button class="p" data-close="ovDay">Fechar</button></div></div></div>
+<div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
 
 <div class="ov" id="ovCfg"><div class="box" role="dialog" aria-modal="true" aria-label="Configurações">
   <h2>Configurações</h2>

@@ -18,20 +18,23 @@ let user=null, role=null, mode='m', D=today(), busy=false, loadSeq=0, editId=nul
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
 function pos(id,d){let b=0;while(W(id,add(d,-b-1)))b++;return b+1}
-function run(id,d){let b=0,f=0;while(W(id,add(d,-b-1)))b++;while(W(id,add(d,f+1)))f++;return 1+b+f}
 function sunV(e,d){return e.sex==='F'&&d.getDay()===0&&W(e.id,d)&&(W(e.id,add(d,-7))||W(e.id,add(d,7)))}
 const check=(e,d)=>validateWork(e,d,W);
 function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)':'';t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5200)}
 function info(e,d){
   const c=st(e.id,d);
   if(c==='T'){const p=pos(e.id,d),sv=sunV(e,d);
-    if(p>=7)return{c:'bad',t:p+'º dia ✕ irregular'};
-    if(sv)return{c:'bad',t:'2 domingos ✕'};
-    return{c:p===6?'lim':'t',t:'Trab. '+p+'º'+(p===6?' · limite':'')}}
-  if(c==='F')return{c:'f',t:'Folga'};
-  if(W(e.id,add(d,-1))&&pos(e.id,add(d,-1))>=6)return{c:'must',t:'Folga obrigatória'};
-  if(e.sex==='F'&&d.getDay()===0&&(W(e.id,add(d,-7))||W(e.id,add(d,7))))return{c:'must',t:'Domingo bloqueado'};
-  return{c:'z',t:'—'};
+    return{c:p>=7||sv?'bad':'t',t:'Trabalho',detail:sv?'Domingos consecutivos':p+'º dia seguido'}}
+  if(c==='F')return{c:'f',t:'Folga',detail:''};
+  return{c:'z',t:'Sem lançamento',detail:''};
+}
+const visibleOn=d=>S.emps.filter(e=>e.ativo||st(e.id,d));
+function dayGroup(label,list,css,limit){
+  if(!list.length)return '';
+  const chips=list.slice(0,limit).map(e=>'<span class="person-chip" title="'+esc(e.name)+'">'+esc(e.name)+'</span>').join('');
+  const remaining=list.length-limit;
+  const extra=remaining>0?'<span class="more-count">+'+remaining+' '+(remaining===1?'pessoa':'pessoas')+'</span>':'';
+  return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+extra+'</div></div>';
 }
 function render(){
   const t=today();let y=D.getFullYear(),m=D.getMonth(),from,to;
@@ -41,40 +44,38 @@ function render(){
     let h='<div class="cal">'+WD.map(w=>'<div class="h">'+w+'</div>').join('');
     for(let i=0;i<wks*7;i++){
       const d=add(f,i-f.getDay());
-      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+'"><span class="n">'+d.getDate()+'</span>'
-        +S.emps.map(e=>{const o=info(e,d);return '<div class="ch '+o.c+'" title="'+esc(e.name+' — '+o.t)+'"><span>'+esc(e.name.split(' ')[0])+'</span><em>'+o.t+'</em></div>'}).join('')+'</div>';
+      const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
+      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
+        +(working.length||off.length?dayGroup('Trabalho',working,'work',3)+dayGroup('Folga',off,'off',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
     const s0=add(D,-D.getDay()),s6=add(s0,6);from=s0;to=s6;
     $('#ttl').textContent=s0.getDate()+' '+MN[s0.getMonth()].slice(0,3)+' a '+s6.getDate()+' '+MN[s6.getMonth()].slice(0,3)+' '+s6.getFullYear();
+    const weekEmps=S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean));
     let h='<div class="sc"><table><tr><th class="nm">Funcionário</th>';
-    for(let i=0;i<7;i++){const d=add(s0,i);h+='<th>'+WD[i]+'<small>'+fd(d)+'</small></th>'}
-    h+='<th>Maior sequência</th></tr>';
-    if(!S.emps.length)h+='<tr><td class="empty" colspan="9">Nenhum funcionário. Adicione em Configurações.</td></tr>';
-    S.emps.forEach(e=>{
-      let mx=0;
-      h+='<tr><td class="nm"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><b>'+esc(e.name)+'</b><span class="tag">'+(e.sex==='F'?'Mulher':'Homem')+'</span><small class="r">'+esc(e.role||'')+'</small></td>';
-      for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);if(W(e.id,d))mx=Math.max(mx,run(e.id,d));
-        h+='<td class="c '+o.c+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+'">'+o.t+'</td>'}
-      h+='<td><b style="color:'+(mx>6?'var(--dg)':mx===6?'var(--wk)':'var(--ok)')+'">'+mx+' dia'+(mx===1?'':'s')+'</b></td></tr>';
+    for(let i=0;i<7;i++){const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;h+='<th>'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span></th>'}
+    h+='</tr>';
+    if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário neste período.</td></tr>';
+    weekEmps.forEach(e=>{
+      h+='<tr><td class="nm"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></td>';
+      for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
+        h+='<td class="c '+o.c+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail)+'</small>':'')+'</td>'}
+      h+='</tr>';
     });
     $('#view').innerHTML=h+'</table></div>';
   }
   $('#tM').className=mode==='m'?'on':'';$('#tW').className=mode==='w'?'on':'';
-  /* alertas do período exibido */
-  const A=[];let nLim=0,nBad=0;
+  /* Somente irregularidades reais permanecem visíveis; a validação continua no banco. */
+  const A=[];
   S.emps.forEach(e=>{for(let d=from;+d<=+to;d=add(d,1)){
     if(!W(e.id,d))continue;const p=pos(e.id,d);
-    if(p>=7){nBad++;A.push({k:'d',t:'<b>'+esc(e.name)+'</b>: '+p+'º dia seguido de trabalho em '+fd(d)+'. Irregular, folga (DSR) obrigatória.'})}
-    else if(p===6){nLim++;A.push({k:'w',t:'<b>'+esc(e.name)+'</b>: 6º dia seguido em '+fd(d)+'. Folga obrigatória em '+fd(add(d,1))+'.'})}
-    else if(p===5){A.push({k:'w',t:'<b>'+esc(e.name)+'</b>: 5º dia seguido em '+fd(d)+'. Atenção ao limite.'})}
-    if(sunV(e,d)&&W(e.id,add(d,7))){nBad++;A.push({k:'d',t:'<b>'+esc(e.name)+'</b>: trabalha 2 domingos seguidos ('+fd(d)+' e '+fd(add(d,7))+'). Art. 386 da CLT.'})}
+    if(p>=7)A.push('<b>'+esc(e.name)+'</b>: '+p+' dias seguidos de trabalho em '+fd(d)+'. Revise a escala.');
+    if(sunV(e,d)&&W(e.id,add(d,7)))A.push('<b>'+esc(e.name)+'</b>: dois domingos consecutivos de trabalho ('+fd(d)+' e '+fd(add(d,7))+').');
   }});
-  const wk=S.emps.filter(e=>W(e.id,t)).length,fo=S.emps.filter(e=>st(e.id,t)==='F').length;
-  $('#kpis').innerHTML=[['Funcionários',S.emps.length,''],['Trabalham hoje',wk,''],['De folga hoje',fo,''],['No limite (6º dia)',nLim,'w'],['Irregularidades',nBad,'d']].map(k=>'<div class="kpi '+k[2]+'"><b>'+k[1]+'</b><span>'+k[0]+(k[2]?' · período':'')+'</span></div>').join('');
-  A.sort((a,b)=>a.k<b.k?-1:1);
-  $('#alerts').innerHTML=A.slice(0,8).map(a=>'<div class="'+a.k+'">'+a.t+'</div>').join('')+(A.length>8?'<div class="w">+ '+(A.length-8)+' alertas no período.</div>':'');
+  const active=S.emps.filter(e=>e.ativo),wk=S.emps.filter(e=>W(e.id,t)).length,fo=S.emps.filter(e=>st(e.id,t)==='F').length,empty=active.filter(e=>!st(e.id,t)).length;
+  $('#kpis').innerHTML=[['Funcionários ativos',active.length,'staff'],['Trabalham hoje',wk,'work'],['De folga hoje',fo,'off'],['Sem lançamento hoje',empty,'pending']].map(k=>'<div class="kpi '+k[2]+'"><b>'+k[1]+'</b><span>'+k[0]+'</span></div>').join('');
+  $('#alerts').innerHTML=A.length?'<div class="d"><strong>Escalas para revisar</strong> · '+A.slice(0,5).join(' · ')+(A.length>5?' · +'+(A.length-5)+' outra(s)':'')+'</div>':'';
 }
 
 function bounds(){
@@ -135,17 +136,24 @@ async function setSt(id,ds,v){
   await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
     p_versao:S.versions[`${id}|${ds}`]??null}));
 }
-function openDay(ds){
+function openDay(ds,selectedId){
   if(!ds)return;
   const opening=$('#ovDay').style.display!=='flex';
   if(opening)modalReturnFocus=document.activeElement;
   const d=fromKey(ds);$('#dT').textContent=WD[d.getDay()]+', '+d.toLocaleDateString('pt-BR');
-  $('#dB').innerHTML=S.emps.length?S.emps.map(e=>{
+  const emps=visibleOn(d).sort((a,b)=>{
+    const rank=e=>st(e.id,d)==='T'?0:st(e.id,d)==='F'?1:2;
+    return rank(a)-rank(b)||a.name.localeCompare(b.name,'pt-BR');
+  });
+  const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length;
+  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off)+' sem lançamento</span>';
+  $('#dB').innerHTML=emps.length?emps.map(e=>{
     const c=st(e.id,d),o=info(e,d),bl=c!=='T'?check(e,d):'',can=role!=='visualizacao'&&(e.ativo||c&&role==='administrador');
-    return '<div class="dr"><div><b>'+esc(e.name)+'</b><span class="tag">'+(e.sex==='F'?'Mulher':'Homem')+'</span>'+(e.ativo?'':' · desativado')+(o.c!=='z'?'<small class="r" style="margin-left:0">'+o.t+'</small>':'')+'</div><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl||!can?' disabled':'')+'>Trabalho</button> <button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Folga</button> <button data-s="" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Limpar</button></div>'+(bl?'<div class="bl">🚫 '+esc(bl.replace(/^Bloqueado: /,''))+'</div>':'')+'</div>';
-  }).join(''):'<div class="empty">Nenhum funcionário cadastrado.</div>';
+    const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small></span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+  }).join(''):'<div class="empty">Nenhum funcionário neste dia.</div>';
   $('#dB').dataset.d=ds;$('#ovDay').style.display='flex';
-  if(opening)$('#dB button:not(:disabled)')?.focus();
+  if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"]:not(:disabled)'):null;(selected||$('#dB button:not(:disabled)')||$('#ovDay [data-close]')).focus()}
 }
 function cfg(){
   $('#list').innerHTML=S.emps.length?S.emps.map(e=>'<div class="li '+(e.ativo?'':'inactive')+'"><span><b>'+esc(e.name)+'</b> · '+(e.sex==='F'?'Mulher':'Homem')+(e.role?' · '+esc(e.role):'')+(e.equipe?' · '+esc(e.equipe):'')+(e.ativo?'':' · desativado')+'</span>'+(role==='administrador'?'<button data-ed="'+e.id+'">Editar</button>':'')+'</div>').join(''):'<div class="empty">Nenhum funcionário.</div>';
@@ -166,7 +174,7 @@ function resetForm(){editId=null;for(const id of ['fN','fR','fM','fE'])$('#'+id)
 
 $('#view').addEventListener('click',ev=>{
   const c=ev.target.closest('[data-e]'),dy=ev.target.closest('[data-day]');
-  if(c){const current=st(c.dataset.e,fromKey(c.dataset.d));setSt(c.dataset.e,c.dataset.d,!current?'T':current==='T'?'F':'')}
+  if(c)openDay(c.dataset.d,c.dataset.e);
   else if(dy)openDay(dy.dataset.day);
 });
 $('#view').addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('[data-day],[data-e]')){ev.preventDefault();ev.target.click()}});
