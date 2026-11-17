@@ -14,7 +14,7 @@ const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1);
 let S={emps:[],rec:{},versions:{},empVersions:{}};
-let user=null, role=null, mode='m', D=today(), busy=false, loadSeq=0, editId=null, preview=null, legacy=null, uploadedLegacy=null, migrationReport=null, modalReturnFocus=null;
+let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, preview=null, legacy=null, uploadedLegacy=null, migrationReport=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
 const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W);
@@ -22,6 +22,17 @@ const warningsOn=(e,d)=>workWarnings(e,d,W);
 function pos(id,d){let b=0;while(W(id,add(d,-b-1)))b++;return b+1}
 const check=(e,d)=>validateWork(e,d,W);
 function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)':'';t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5200)}
+function showPage(nextPage){
+  if(!user)return;
+  page=nextPage;
+  for(const [name,id,button] of [['schedule','schedulePage','bSchedule'],['employees','employeesPage','bEmployees'],['admin','adminPage','bAdmin']]){
+    $('#'+id).hidden=name!==page;
+    $('#'+button).classList.toggle('active',name===page);
+    if(name===page)$('#'+button).setAttribute('aria-current','page');else $('#'+button).removeAttribute('aria-current');
+  }
+  if(page!=='schedule')cfg();
+  window.scrollTo({top:0,behavior:'instant'});
+}
 function info(e,d){
   const c=st(e.id,d);
   if(c==='T'){
@@ -65,24 +76,29 @@ function render(){
   }else{
     const s0=add(D,-D.getDay()),s6=add(s0,6);from=s0;to=s6;
     $('#ttl').textContent=s0.getDate()+' '+MN[s0.getMonth()].slice(0,3)+' a '+s6.getDate()+' '+MN[s6.getMonth()].slice(0,3)+' '+s6.getFullYear();
-    const weekEmps=S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean));
-    let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><tr><th class="nm">Funcionário</th>';
+    const search=$('#weekSearch').value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+    const team=$('#weekTeam').value;
+    const weekEmps=S.emps.filter(e=>(e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean))&&
+      (!team||e.equipe===team)&&(!search||[e.name,e.role].some(value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(search))));
+    $('#weekResults').textContent=weekEmps.length+' funcionário'+(weekEmps.length===1?'':'s');
+    let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><thead><tr><th class="nm" scope="col">Funcionário</th>';
     for(let i=0;i<7;i++){
       const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
       const off=weekEmps.filter(e=>st(e.id,d)==='F').length;
       const blocked=weekEmps.filter(e=>restrictionsOn(e,d).length>0).length;
-      h+='<th class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(off?'<span class="th-off">'+off+' folga'+(off===1?'':'s')+'</span>':'')+(blocked?'<span class="th-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+'</span>':'')+'</th>';
+      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(off?'<span class="th-off">'+off+' folga'+(off===1?'':'s')+'</span>':'')+(blocked?'<span class="th-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+'</span>':'')+'</th>';
     }
-    h+='</tr>';
-    if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário neste período.</td></tr>';
+    h+='</tr></thead><tbody>';
+    if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário corresponde aos filtros desta semana.</td></tr>';
     weekEmps.forEach(e=>{
-      h+='<tr><td class="nm"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></td>';
+      h+='<tr><th scope="row" class="nm employee-row-header"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></th>';
       for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
         h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail)+'</small>':'')+'</td>'}
       h+='</tr>';
     });
-    $('#view').innerHTML=h+'</table></div>';
+    $('#view').innerHTML=h+'</tbody></table></div>';
   }
+  $('#weekTools').hidden=mode!=='w';
   $('#tM').className=mode==='m'?'on':'';$('#tW').className=mode==='w'?'on':'';
   /* Somente irregularidades reais permanecem visíveis; a validação continua no banco. */
   const A=[];
@@ -116,9 +132,9 @@ async function refresh(){
   try{
     const [emps,records,p]=await Promise.all([employees(),journeys(start,end),profile(user.id)]);
     if(seq!==loadSeq)return;
-    if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovCfg').style.display='none';$('#ovDay').style.display='none';$('#main').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
-    $('#csv').value='';$('#auditView').textContent='';
-    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
+    if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
+    if(role!==p.perfil){$('#csv').value='';$('#auditView').textContent=''}
+    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;$('#bAdmin').textContent=role==='administrador'?'Administração':'Dados e regras';$('#adminTitle').textContent=$('#bAdmin').textContent;
     const rec={},versions={};
     for(const r of records){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
@@ -126,7 +142,11 @@ async function refresh(){
     }
     S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,
       empVersions:Object.fromEntries(emps.map(e=>[e.id,e.atualizado_em]))};
-    render();if($('#ovCfg').style.display==='flex')cfg();
+    const selectedTeam=$('#weekTeam').value;
+    const teams=[...new Set(S.emps.map(e=>e.equipe).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    $('#weekTeam').replaceChildren(new Option('Todas as equipes',''),...teams.map(name=>new Option(name,name)));
+    $('#weekTeam').value=teams.includes(selectedTeam)?selectedTeam:'';
+    render();if(page!=='schedule')cfg();
     if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
     setSync('Sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error))}}
@@ -134,7 +154,7 @@ async function refresh(){
 async function mutate(action,onError){
   if(busy)return;
   busy=true;setSync('Salvando…');
-  try{await action();await refresh();toast('Alteração salva no banco.',true)}
+  try{await action();$('#csv').value='';$('#auditView').textContent='';await refresh();toast('Alteração salva no banco.',true)}
   catch(error){onError?.(error);toast(explain(error));await refresh()}
   finally{busy=false}
 }
@@ -187,14 +207,23 @@ function openDay(ds,selectedId){
   $('#dB').dataset.d=ds;renderDayRows(ds);$('#ovDay').style.display='flex';
   if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"][data-s="T"]:not(:disabled)')||$('#dB [data-e="'+selectedId+'"][data-s="F"]:not(:disabled)'):null;(selected||$('#dSearch')).focus()}
 }
+function renderEmployees(){
+  const query=$('#empSearch').value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+  const status=$('#empStatus').value;
+  const visible=S.emps.filter(e=>(status==='all'||status==='active'&&e.ativo||status==='inactive'&&!e.ativo)&&
+    (!query||[e.name,e.role,e.equipe,e.matricula].some(value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(query))));
+  $('#employeeCount').textContent=visible.length+' de '+S.emps.length+' funcionário'+(S.emps.length===1?'':'s');
+  $('#list').innerHTML=visible.length?visible.map(e=>'<div class="employee-item'+(e.ativo?'':' inactive')+'"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><div class="employee-item-info"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · ')||'Sem cargo ou equipe')+'</small></div><span class="employee-state '+(e.ativo?'active':'')+'">'+(e.ativo?'Ativo':'Desativado')+'</span>'+(role==='administrador'?'<button data-ed="'+e.id+'">Editar</button>':'')+'</div>').join(''):'<div class="empty">Nenhum funcionário encontrado.</div>';
+}
 function cfg(){
   populateRoleOptions();
-  $('#list').innerHTML=S.emps.length?S.emps.map(e=>'<div class="li '+(e.ativo?'':'inactive')+'"><span><b>'+esc(e.name)+'</b> · '+(e.sex==='F'?'Mulher':'Homem')+(e.role?' · '+esc(e.role):'')+(e.equipe?' · '+esc(e.equipe):'')+(e.ativo?'':' · desativado')+'</span>'+(role==='administrador'?'<button data-ed="'+e.id+'">Editar</button>':'')+'</div>').join(''):'<div class="empty">Nenhum funcionário.</div>';
-  $('#fT').hidden=role!=='administrador';$('#bAdd').hidden=role!=='administrador';
-  document.querySelectorAll('#ovCfg .g').forEach(el=>el.hidden=role!=='administrador');
+  renderEmployees();
+  $('#employeeFormPanel').hidden=role!=='administrador';
+  $('#bNewEmployee').hidden=role!=='administrador';
   updateOtherRoleVisibility();
   $('#adminTools').hidden=role!=='administrador';
   $('#bExp').disabled=role==='visualizacao';$('#bCp').disabled=role==='visualizacao';$('#bDownload').disabled=role==='visualizacao';
+  if(page!=='admin')return;
   try{
     legacy=uploadedLegacy||readLegacy();
     $('#migrationPreview').textContent=migrationReport|| (legacy
@@ -235,12 +264,15 @@ $('#dB').addEventListener('click',ev=>{const b=ev.target.closest('[data-s]');if(
 $('#dSearch').addEventListener('input',()=>renderDayRows($('#dB').dataset.d));
 $('#dFilter').addEventListener('change',()=>renderDayRows($('#dB').dataset.d));
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{$('#'+b.dataset.close).style.display='none';modalReturnFocus?.focus()});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){for(const id of ['ovDay','ovCfg'])if($('#'+id).style.display==='flex'){$('#'+id).style.display='none';modalReturnFocus?.focus();break}}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('#ovDay').style.display==='flex'){$('#ovDay').style.display='none';modalReturnFocus?.focus()}});
+$('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');$('#bAdmin').onclick=()=>showPage('admin');
+$('#bNewEmployee').onclick=()=>{resetForm();$('#employeeFormPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#fN').focus({preventScroll:true})};
+$('#empSearch').addEventListener('input',renderEmployees);$('#empStatus').addEventListener('change',renderEmployees);
+$('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);
 $('#tM').onclick=()=>{mode='m';refresh()};$('#tW').onclick=()=>{mode='w';refresh()};
 $('#pv').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()-1,1):add(D,-7);refresh()};
 $('#nx').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()+1,1):add(D,7);refresh()};
 $('#td').onclick=()=>{D=today();refresh()};$('#bReload').onclick=refresh;
-$('#bCfg').onclick=()=>{modalReturnFocus=document.activeElement;cfg();$('#ovCfg').style.display='flex';(role==='administrador'?$('#fN'):$('#ovCfg [data-close="ovCfg"]')).focus()};
 $('#bCan').onclick=resetForm;
 $('#fR').addEventListener('change',()=>{updateOtherRoleVisibility();if(!$('#otherRoleWrap').hidden)$('#fROther').focus()});
 $('#list').addEventListener('click',ev=>{
@@ -318,15 +350,16 @@ $('#bAudit').onclick=async()=>{
 };
 async function showSession(){
   const {data:{user:current},error}=await db.auth.getUser();
-  if(error||!current){user=null;role=null;loadSeq++;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovCfg').style.display='none';$('#ovDay').style.display='none';$('#main').hidden=true;$('#ovLogin').style.display='flex';$('#bCfg').hidden=true;$('#bReload').hidden=true;$('#bOut').hidden=true;$('#user').textContent='';setSync('Aguardando login');return}
+  if(error||!current){user=null;role=null;loadSeq++;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#bReload').hidden=true;$('#bOut').hidden=true;$('#user').textContent='';setSync('Aguardando login');return}
   try{
     const p=await profile(current.id);
     if(!p||!p.ativo)throw new Error('Conta sem perfil ativo. Solicite acesso ao administrador.');
+    if(user?.id!==current.id){S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';page='schedule'}
     user=current;role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
-    $('#main').hidden=false;$('#ovLogin').style.display='none';$('#loginError').textContent='';
-    $('#bCfg').hidden=false;$('#bReload').hidden=false;$('#bOut').hidden=false;
+    $('#main').hidden=false;$('#mainNav').hidden=false;$('#ovLogin').style.display='none';$('#loginError').textContent='';
+    $('#bReload').hidden=false;$('#bOut').hidden=false;showPage(page);
     await refresh();
-  }catch(e){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovCfg').style.display='none';$('#ovDay').style.display='none';$('#main').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent=explain(e);setSync('Acesso indisponível',true)}
+  }catch(e){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent=explain(e);setSync('Acesso indisponível',true)}
 }
 $('#loginForm').addEventListener('submit',async ev=>{
   ev.preventDefault();if(!configured)return;
@@ -346,7 +379,7 @@ $('#passwordForm').addEventListener('submit',async ev=>{
   $('#passwordError').textContent=error?explain(error):'Senha atualizada.';
   if(!error){$('#newPassword').value='';$('#ovPassword').style.display='none';showSession()}
 });
-$('#bOut').onclick=async()=>{await db.auth.signOut();$('#ovCfg').style.display='none';$('#ovDay').style.display='none';showSession()};
+$('#bOut').onclick=async()=>{await db.auth.signOut();$('#ovDay').style.display='none';page='schedule';showSession()};
 
   if(!configured){$('#loginError').textContent='Configure SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY em js/config.js e verifique o carregamento do SDK.';setSync('Configuração pendente',true)}
 else{

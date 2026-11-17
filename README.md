@@ -1,6 +1,6 @@
 # Controle de Escalas e DSR
 
-Aplicação estática baseada no arquivo original `Controle_de_Escalas_e_DSR.html`. Mantém calendário mensal e semanal, lançamento de trabalho/folga, alertas, cadastro e CSV. O PostgreSQL do Supabase é a fonte dos dados. O navegador consulta períodos e só lê `localStorage` quando o administrador inicia uma migração.
+Aplicação estática baseada no arquivo original `Controle_de_Escalas_e_DSR.html`. Oferece telas de Escalas, Funcionários e Administração, calendário mensal e semanal, lançamento de trabalho/folga, alertas, cadastro e CSV. O PostgreSQL do Supabase é a fonte dos dados. O navegador consulta períodos e só lê `localStorage` quando o administrador inicia uma migração.
 
 ## Estrutura
 
@@ -25,5 +25,7 @@ Para publicar no GitHub Pages, siga [IMPLANTACAO.md](docs/IMPLANTACAO.md). O ser
 ## Perfis
 
 Administrador consulta e altera todos os funcionários e jornadas, importa CSV e consulta auditoria. Gestor consulta e altera jornadas das equipes atribuídas. Visualização só consulta as equipes atribuídas. Funcionários sem equipe aparecem apenas ao administrador, até serem atribuídos a uma equipe. O cadastro oferece Despachante, Supervisor, Coordenador e Analista, com opção de criar outros cargos.
+
+A visão semanal permite buscar por nome ou cargo e filtrar por equipe. A tela Funcionários oferece busca e filtro por situação; somente o administrador vê o formulário de cadastro. A tela Administração mostra as regras e respeita as permissões de exportação, importação e auditoria de cada perfil.
 
 As validações de seis dias e domingos são regras operacionais deste sistema; não substituem uma análise completa de conformidade trabalhista.

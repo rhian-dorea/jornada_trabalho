@@ -4,49 +4,53 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Controle de Escalas e DSR</title>
+<link rel="icon" type="image/svg+xml" href="./assets/mark.svg">
 <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
 <header>
-  <div class="brand"><div class="logo">📅</div><div><h1>Controle de Escalas e DSR</h1><p>Descanso semanal remunerado · dados sincronizados</p></div></div>
-  <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bCfg" hidden>⚙ Configurações</button><button id="bOut" hidden>Sair</button></div>
+  <div class="brand"><div class="logo"><img src="./assets/mark.svg" alt=""></div><div><h1>Controle de Escalas e DSR</h1><p>Descanso semanal remunerado · dados sincronizados</p></div></div>
+  <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bOut" hidden>Sair</button></div>
 </header>
+<nav class="main-nav" id="mainNav" aria-label="Navegação principal" hidden>
+  <div class="main-nav-inner"><button id="bSchedule" class="active" aria-current="page">Escalas</button><button id="bEmployees">Funcionários</button><button id="bAdmin">Administração</button></div>
+</nav>
 <main id="main" hidden>
-  <section class="alerts" id="alerts" aria-live="polite"></section>
-  <section class="panel schedule-panel">
+  <div class="page-section" id="schedulePage">
+    <section class="alerts" id="alerts" aria-live="polite"></section>
+    <section class="panel schedule-panel">
     <div class="bar">
       <div class="section-intro"><span class="eyebrow">Planejamento da equipe</span><h2>Calendário de trabalho</h2><p>Veja quem trabalha, quem está de folga e os descansos exigidos. Selecione um dia para ajustar a escala.</p></div>
       <div class="tabs" role="group" aria-label="Modo de visualização"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
     </div>
     <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="lg"><span><i class="legend-work"></i>Trabalho</span><span><i class="legend-off"></i>Folga</span><span><i class="legend-blocked"></i>Descanso necessário / aviso</span></div></div>
+    <div class="week-tools" id="weekTools" hidden><div><label for="weekSearch">Buscar na semana</label><input id="weekSearch" type="search" placeholder="Nome ou cargo" autocomplete="off"></div><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
     <div id="view"></div>
+    </section>
+  </div>
+  <section class="page-section" id="employeesPage" hidden>
+    <div class="page-heading"><div><span class="eyebrow">Equipe</span><h2>Funcionários</h2><p>Consulte a equipe e mantenha os dados de cada pessoa atualizados.</p></div><div class="page-heading-actions"><span id="employeeCount" class="page-count"></span><button id="bNewEmployee" class="p">+ Novo funcionário</button></div></div>
+    <div class="management-layout">
+      <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Diretório</span><h3>Equipe cadastrada</h3></div></div><div class="employee-filters"><div><label for="empSearch">Buscar funcionário</label><input id="empSearch" type="search" placeholder="Nome, cargo ou equipe" autocomplete="off"></div><div><label for="empStatus">Situação</label><select id="empStatus"><option value="active">Ativos</option><option value="all">Todos</option><option value="inactive">Desativados</option></select></div></div><div id="list" class="employee-list"></div></section>
+      <section class="panel management-panel form-panel" id="employeeFormPanel"><div class="panel-heading"><div><span class="eyebrow">Cadastro</span><h3 id="fT">Adicionar funcionário</h3></div></div><div class="form-grid"><div><label for="fN">Nome</label><input id="fN" maxlength="60"></div><div><label for="fS">Sexo</label><select id="fS"><option value="M">Homem</option><option value="F">Mulher</option></select></div><div><label for="fR">Cargo</label><select id="fR"><option value="">Selecione</option><option>Despachante</option><option>Supervisor</option><option>Coordenador</option><option>Analista</option><option value="__other__">+ Adicionar outro cargo</option></select></div><div id="otherRoleWrap" hidden><label for="fROther">Novo cargo</label><input id="fROther" maxlength="40" placeholder="Digite o nome do cargo"></div><div><label for="fM">Matrícula (opcional)</label><input id="fM" maxlength="80"></div><div><label for="fE">Equipe (opcional)</label><input id="fE" maxlength="80"></div><div><label for="fA">Situação</label><select id="fA"><option value="true">Ativo</option><option value="false">Desativado</option></select></div></div><div class="form-actions"><button class="p" id="bAdd">Adicionar</button><button id="bCan" hidden>Cancelar edição</button></div></section>
+    </div>
+  </section>
+  <section class="page-section" id="adminPage" hidden>
+    <div class="page-heading"><div><span class="eyebrow">Gestão de dados</span><h2 id="adminTitle">Administração</h2><p>Consulte as regras e gerencie os registros autorizados.</p></div></div>
+    <div class="admin-layout">
+      <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Escalas</span><h3>Regras aplicadas</h3></div></div><ul class="rules"><li>Cargos comuns: até 6 dias seguidos. Supervisor e Coordenador: o 7º dia é permitido com aviso vermelho; o 8º é bloqueado.</li><li>Mulheres em cargos comuns não podem trabalhar 2 domingos seguidos. Supervisor e Coordenador podem trabalhar 2, com aviso vermelho; o 3º é bloqueado.</li><li>A sequência é conferida pelas datas, inclusive na virada de mês. Dia sem lançamento não conta como trabalhado.</li></ul></section>
+      <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Saída de dados</span><h3>Exportar registros</h3></div></div><p>Inclui todo o histórico autorizado.</p><textarea id="csv" readonly aria-label="CSV para exportar"></textarea><div class="form-actions"><button id="bExp">Preparar CSV</button><button id="bCp">Copiar</button><button id="bDownload">Baixar CSV</button></div></section>
+      <div id="adminTools" class="admin-extra">
+        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Entrada de dados</span><h3>Importar registros</h3></div></div><p>Revise as linhas antes de confirmar a importação.</p><textarea id="imp" placeholder="Funcionario;Sexo;Cargo;Data;Registro" aria-label="CSV para importar"></textarea><div class="form-actions"><button id="bPreview">Prévia</button><button id="bImp" disabled>Confirmar importação</button></div><div id="importPreview" role="status"></div></section>
+        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Histórico</span><h3>Migração do navegador</h3></div></div><label for="legacyFile">JSON de backup da origem antiga (opcional)</label><input id="legacyFile" type="file" accept=".json,application/json"><div id="migrationPreview" role="status"></div><div class="form-actions"><button id="bBackup">Baixar backup</button><button id="bMigrate">Confirmar migração</button></div></section>
+        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Rastreabilidade</span><h3>Auditoria</h3></div></div><button id="bAudit">Consultar alterações recentes</button><div id="auditView"></div></section>
+      </div>
+    </div>
   </section>
 </main>
 
 <div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div class="day-tools"><div><label for="dSearch">Buscar funcionário</label><input id="dSearch" type="search" placeholder="Digite um nome" autocomplete="off"></div><div><label for="dFilter">Mostrar</label><select id="dFilter"><option value="all">Todos</option><option value="work">Trabalho</option><option value="off">Folga</option><option value="blocked">Descanso necessário</option><option value="exception">Avisos de exceção</option><option value="empty">Sem lançamento</option></select></div></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
 
-<div class="ov" id="ovCfg"><div class="box" role="dialog" aria-modal="true" aria-label="Configurações">
-  <h2>Configurações</h2>
-  <h3 id="fT">Adicionar funcionário</h3>
-  <div class="g"><div><label for="fN">Nome</label><input id="fN" maxlength="60"></div>
-  <div><label for="fS">Sexo</label><select id="fS"><option value="M">Homem</option><option value="F">Mulher</option></select></div>
-  <div><label for="fR">Cargo</label><select id="fR"><option value="">Selecione</option><option>Despachante</option><option>Supervisor</option><option>Coordenador</option><option>Analista</option><option value="__other__">+ Adicionar outro cargo</option></select></div></div>
-  <div id="otherRoleWrap" hidden><label for="fROther">Novo cargo</label><input id="fROther" maxlength="40" placeholder="Digite o nome do cargo"></div>
-  <div class="g"><div><label for="fM">Matrícula (opcional)</label><input id="fM" maxlength="80"></div><div><label for="fE">Equipe (opcional)</label><input id="fE" maxlength="80"></div><div><label for="fA">Situação</label><select id="fA"><option value="true">Ativo</option><option value="false">Desativado</option></select></div></div>
-  <div style="margin-top:10px;display:flex;gap:6px"><button class="p" id="bAdd">Adicionar</button><button id="bCan" hidden>Cancelar edição</button></div>
-  <h3>Funcionários</h3><div id="list"></div>
-  <h3>Regras aplicadas</h3>
-  <ul class="rules"><li>Cargos comuns: até 6 dias seguidos. Supervisor e Coordenador: o 7º dia é permitido com aviso vermelho; o 8º é bloqueado.</li><li>Mulheres em cargos comuns não podem trabalhar 2 domingos seguidos. Supervisor e Coordenador podem trabalhar 2, com aviso vermelho; o 3º é bloqueado.</li><li>A sequência é conferida pelas datas, inclusive na virada de mês. Dia sem lançamento não conta como trabalhado.</li></ul>
-  <h3>Exportar registros (CSV)</h3><p>Inclui todo o histórico autorizado.</p><textarea id="csv" readonly aria-label="CSV para exportar"></textarea>
-  <div style="margin-top:6px"><button id="bExp">Preparar CSV</button><button id="bCp">Copiar</button><button id="bDownload">Baixar CSV</button></div>
-  <div id="adminTools">
-    <h3>Importar registros (CSV)</h3><textarea id="imp" placeholder="Funcionario;Sexo;Cargo;Data;Registro" aria-label="CSV para importar"></textarea>
-    <div style="margin-top:6px"><button id="bPreview">Prévia</button><button id="bImp" disabled>Confirmar importação</button></div><div id="importPreview" role="status"></div>
-    <h3>Migração do navegador</h3><label for="legacyFile">JSON de backup da origem antiga (opcional)</label><input id="legacyFile" type="file" accept=".json,application/json"><div id="migrationPreview" role="status"></div><button id="bBackup">Baixar backup</button><button id="bMigrate">Confirmar migração</button>
-    <h3>Auditoria</h3><button id="bAudit">Consultar alterações recentes</button><div id="auditView"></div>
-  </div>
-  <div style="text-align:right;margin-top:14px"><button class="p" data-close="ovCfg">Fechar</button></div>
-</div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div class="ov" id="ovLogin" style="display:flex"><form class="box" id="loginForm"><h2>Acessar Controle de Escalas</h2><p>Entre com sua conta autorizada.</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><div style="display:flex;gap:8px;margin-top:14px"><button class="p" type="submit" id="bLogin">Entrar</button><button type="button" id="bReset">Recuperar senha</button></div><p id="loginError" role="alert"></p></form></div>
 <div class="ov" id="ovPassword"><form class="box" id="passwordForm"><h2>Definir nova senha</h2><label for="newPassword">Nova senha</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" required><div style="margin-top:14px"><button class="p" type="submit">Salvar senha</button></div><p id="passwordError" role="alert"></p></form></div>
