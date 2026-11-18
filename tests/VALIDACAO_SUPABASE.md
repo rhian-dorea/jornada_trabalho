@@ -38,7 +38,7 @@
 ## Configurações, turnos e cobertura
 
 1. Aplique `006_configuracoes_empresa.sql` em homologação e confira que IDs, jornadas e perfis anteriores foram preservados; todos recebem `empresa_id`.
-2. Entre como administrador, mude nome, cor, tema e cobertura geral/equipe. Recarregue e confirme persistência. Gestor e visualização não devem acessar a tela nem chamar `salvar_configuracoes` via API.
+2. Em homologação, chame `salvar_configuracoes` como administrador para mudar nome, cor, tema e cobertura geral/equipe. Recarregue e confirme persistência. Gestor e visualização não devem conseguir chamar a função via API. A interface não oferece tela de Configurações.
 3. Crie dois turnos com cores diferentes e lance jornadas nos dois. Verifique cor, horário no detalhe e na semana, CSV e PDF. Troque Trabalho por Folga: o turno antigo deve ser removido.
 4. Configure interjornada maior que o intervalo entre dois turnos consecutivos e tente gravar o segundo: o banco deve rejeitar. Teste turno que cruza a meia-noite.
 5. Reduza os limites de dias/domigos para um valor incompatível com o histórico: a alteração das regras deve ser revertida integralmente. Teste as viradas de mês e ano.

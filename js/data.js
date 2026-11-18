@@ -34,7 +34,6 @@ export const saveJourney = payload => {
   return db.rpc(p_turno ? 'salvar_jornada_com_turno' : 'salvar_jornada', p_turno ? payload : base).then(check);
 };
 export const companySettings = async () => check(await db.from('empresas').select('id,nome,logo_url,cor_primaria,tema,regras,turnos,cobertura,feriados').limit(1).maybeSingle());
-export const saveCompanySettings = payload => db.rpc('salvar_configuracoes', { p_dados: payload }).then(check);
 export const importRows = rows => db.rpc('importar_csv', { p_linhas: rows }).then(check);
 export const migrateLocal = (origin, emps, rec) => db.rpc('migrar_local', {
   p_origem: origin, p_funcionarios: emps, p_jornadas: rec

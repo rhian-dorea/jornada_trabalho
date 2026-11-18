@@ -1,16 +1,15 @@
 # Controle de Escalas e DSR
 
-Sistema web para planejar jornadas, consultar quem trabalha em cada dia e acompanhar folgas e descansos exigidos pelas regras da escala. A interface tem **Escalas**, **Funcionários** e **Configurações** (administrador). O site é estático; autenticação, dados e validação definitiva ficam no **Supabase (Auth + PostgreSQL)**.
+Sistema web para planejar jornadas, consultar quem trabalha em cada dia e acompanhar folgas e descansos exigidos pelas regras da escala. A interface tem **Escalas** e **Funcionários**. O site é estático; autenticação, dados e validação definitiva ficam no **Supabase (Auth + PostgreSQL)**.
 
 ## Como o sistema funciona
 
 1. **Acesso:** o usuário entra com e-mail e senha. A conta precisa existir no Supabase Auth e ter um perfil ativo na tabela `public.perfis`. O sistema não oferece cadastro público de contas.
-2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. As duas visões usam a mesma busca por nome/cargo e filtros de equipe/cargo. **Hoje** volta ao período atual. O resumo mostra o dia atual e falhas de cobertura do mês selecionado.
+2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. O mês mostra o nome completo de todas as pessoas escaladas para trabalhar em cada dia; as células crescem conforme a equipe. As duas visões usam a mesma busca por nome/cargo e filtros de equipe/cargo. **Hoje** volta ao período atual. O resumo mostra o dia atual e falhas de cobertura do mês selecionado.
 3. **Lançamento diário:** clique em um dia do mês ou na célula de um funcionário na semana. O painel do dia mostra as pessoas autorizadas, permite busca e filtros e oferece **Trabalho**, **Folga** e **Remover**, conforme o perfil de acesso.
 4. **Funcionários:** consulte a lista, busque por nome, cargo, equipe ou matrícula e filtre ativos/desativados. O administrador pode usar **Novo funcionário**, editar os dados e desativar ou reativar uma pessoa. A desativação preserva as jornadas anteriores.
-5. **Configurações:** o administrador define nome/logo/cor/tema da empresa, turnos, limites de descanso, cobertura mínima geral ou por equipe e dia da semana e feriados opcionais. Depois de executar `sql/006_configuracoes_empresa.sql`, o banco persiste e valida essas escolhas. O logo usa uma URL HTTPS pública.
-6. **Exportação:** **Exportar CSV** gera os lançamentos do período e filtros atuais em formato UTF-8 compatível com Excel. **Imprimir / PDF** abre a impressão do navegador; escolha “Salvar como PDF”.
-7. **Sincronização:** após uma gravação, o navegador recarrega os dados do banco. Ele também atualiza a aba visível a cada 60 segundos, ao voltar para ela e quando o usuário clica em **Atualizar**.
+5. **Exportação:** **Exportar CSV** gera os lançamentos do período e filtros atuais em formato UTF-8 compatível com Excel. **Imprimir / PDF** abre a impressão do navegador; escolha “Salvar como PDF”.
+6. **Sincronização:** após uma gravação, o navegador recarrega os dados do banco. Ele também atualiza a aba visível a cada 60 segundos, ao voltar para ela e quando o usuário clica em **Atualizar**.
 
 A pré-validação no navegador mostra bloqueios e avisos rapidamente. Cada alteração passa novamente pelas funções SQL do banco, que conferem permissões, regras e versão do registro antes de confirmar. Se duas pessoas editarem o mesmo registro, a versão antiga provoca um conflito para revisão em vez de sobrescrever a alteração mais recente.
 
@@ -33,7 +32,7 @@ Nos dias de descanso necessário ou de exceção, a interface desabilita o botã
 | Cargo comum | Até 6; o 7º é bloqueado. | Para mulheres, o 2º domingo é bloqueado. |
 | Supervisor ou Coordenador | O 7º é permitido com aviso vermelho; o 8º é bloqueado. | O 2º é permitido com aviso vermelho; o 3º é bloqueado, independentemente do sexo. |
 
-Esses limites são os **padrões** e podem ser editados em Configurações. A interjornada padrão é de 11 horas quando ambos os dias têm horários lançados. As verificações consideram viradas de semana, mês e ano, inclusive lançamentos retroativos. Alterar sexo ou cargo é recusado se isso tornar jornadas existentes inválidas. Veja os detalhes em [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md). Essas regras são requisitos operacionais do sistema; não representam uma verificação completa da legislação trabalhista.
+Esses limites são os **padrões** armazenados no Supabase. A interjornada padrão é de 11 horas quando ambos os dias têm horários lançados. As verificações consideram viradas de semana, mês e ano, inclusive lançamentos retroativos. Alterar sexo ou cargo é recusado se isso tornar jornadas existentes inválidas. Veja os detalhes em [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md). Essas regras são requisitos operacionais do sistema; não representam uma verificação completa da legislação trabalhista.
 
 ## Perfis de acesso e cargos
 

@@ -1,4 +1,4 @@
-import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings, saveCompanySettings } from './data.js';
+import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 
@@ -33,13 +33,12 @@ function applyBrand(){
 function showPage(nextPage){
   if(!user)return;
   page=nextPage;
-  for(const [name,id,button] of [['schedule','schedulePage','bSchedule'],['employees','employeesPage','bEmployees'],['settings','settingsPage','bSettings']]){
+  for(const [name,id,button] of [['schedule','schedulePage','bSchedule'],['employees','employeesPage','bEmployees']]){
     $('#'+id).hidden=name!==page;
     $('#'+button).classList.toggle('active',name===page);
     if(name===page)$('#'+button).setAttribute('aria-current','page');else $('#'+button).removeAttribute('aria-current');
   }
   if(page==='employees')cfg();
-  if(page==='settings')fillSettings();
   window.scrollTo({top:0,behavior:'instant'});
 }
 function info(e,d){
@@ -76,7 +75,8 @@ function dayGroup(label,list,css,limit){
     const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
     const time=item.date?timeFor(e.id,item.date):'';
     const parts=e.name.trim().split(/\s+/),compact=parts.length>1?parts[0]+' '+parts.at(-1)[0]+'.':parts[0];
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--shift-color:'+colorFor(e,item.date||'')+'" title="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'">'+esc(compact)+(time?'<em>'+esc(time)+'</em>':'')+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
+    const shownName=css==='work'?e.name:compact;
+    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--shift-color:'+colorFor(e,item.date||'')+'" title="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'">'+esc(shownName)+(time?'<em>'+esc(time)+'</em>':'')+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
   const remaining=list.length-limit;
   const extra=remaining>0?'<span class="more-count">+'+remaining+' no detalhe</span>':'';
@@ -104,7 +104,7 @@ function render(){
       h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
         +(cover.missing?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
         +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
-        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work',1)+dayGroup('✓ Folga',off,'off',1)+dayGroup('⛔ Descanso',blocked,'blocked',1):'<span class="day-empty">—</span>')+'</div>';
+        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work',workEntries.length)+dayGroup('✓ Folga',off,'off',1)+dayGroup('⛔ Descanso',blocked,'blocked',1):'<span class="day-empty">—</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
@@ -200,10 +200,8 @@ async function refresh(){
     const selectedRole=$('#weekRole').value,roles=[...new Set(S.emps.map(e=>e.role).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     $('#weekRole').replaceChildren(new Option('Todos os cargos',''),...roles.map(name=>new Option(name,name)));
     $('#weekRole').value=roles.includes(selectedRole)?selectedRole:'';
-    $('#bSettings').hidden=role!=='administrador';if(page==='settings'&&role!=='administrador')showPage('schedule');
     applyBrand();
     render();if(page==='employees')cfg();
-    if(page==='settings')fillSettings();
     if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
     setSync('Sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error));if(!S.emps.length)$('#view').innerHTML='<div class="empty-state" role="alert"><strong>Não foi possível carregar a escala</strong><p>'+esc(explain(error))+'</p><button id="retryLoad">Tentar novamente</button></div>'}}
@@ -303,48 +301,6 @@ function selectRole(value){
   updateOtherRoleVisibility();
 }
 function resetForm(){editId=null;for(const id of ['fN','fM','fE','fROther'])$('#'+id).value='';$('#fR').value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true;updateOtherRoleVisibility()}
-function fillSettings(){
-  const s=S.settings;
-  $('#companyName').value=s.nome;$('#companyLogo').value=s.logo_url||'';$('#primaryColor').value=s.cor_primaria;$('#theme').value=s.tema;
-  for(const [id,key] of [['maxDays','dias'],['maxSundays','domingos'],['maxLeaderDays','dias_lideranca'],['maxLeaderSundays','domingos_lideranca'],['minRest','interjornada']])$('#'+id).value=s.regras[key];
-  $('#shiftLines').value=s.turnos.map(x=>[x.nome,x.inicio,x.fim,x.cor].join('; ')).join('\n');
-  $('#coverageGeneral').value=s.cobertura.geral.join(',');
-  $('#coverageTeams').value=Object.entries(s.cobertura.equipes).map(([name,values])=>name+'; '+values.join(',')).join('\n');
-  $('#holidays').value=s.feriados.map(x=>fromKey(x.data).toLocaleDateString('pt-BR')+'; '+x.nome).join('\n');
-}
-function numbers(line){
-  const values=line.split(',').map(x=>Number(x.trim()));
-  if(values.length!==7||values.some(x=>!Number.isInteger(x)||x<0||x>200))throw Error('Cobertura: informe sete números inteiros entre 0 e 200.');
-  return values;
-}
-function readSettings(){
-  const name=$('#companyName').value.trim(),logo=$('#companyLogo').value.trim();
-  if(!name)throw Error('Informe o nome da empresa.');
-  if(logo&&!/^https:\/\//i.test(logo))throw Error('O logo deve usar HTTPS.');
-  const rules=Object.fromEntries([['maxDays','dias'],['maxSundays','domingos'],['maxLeaderDays','dias_lideranca'],['maxLeaderSundays','domingos_lideranca'],['minRest','interjornada']].map(([id,key])=>[key,Number($('#'+id).value)]));
-  if(Object.values(rules).some(x=>!Number.isInteger(x)||x<0||x>24)||!rules.dias||!rules.domingos||!rules.dias_lideranca||!rules.domingos_lideranca)throw Error('Revise os limites das regras.');
-  const turnos=$('#shiftLines').value.split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{
-    const [nome,inicio,fim,cor]=line.split(';').map(x=>x.trim());
-    if(!nome||!/^([01]\d|2[0-3]):[0-5]\d$/.test(inicio)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(fim)||!/^#[0-9a-f]{6}$/i.test(cor))throw Error('Turno inválido: '+line);
-    return {nome,inicio,fim,cor};
-  });
-  if(new Set(turnos.map(x=>norm(x.nome))).size!==turnos.length)throw Error('Os nomes dos turnos devem ser únicos.');
-  const equipes={};for(const line of $('#coverageTeams').value.split('\n').map(x=>x.trim()).filter(Boolean)){
-    const pos=line.indexOf(';');if(pos<1)throw Error('Equipe inválida: '+line);
-    equipes[line.slice(0,pos).trim()]=numbers(line.slice(pos+1));
-  }
-  const feriados=$('#holidays').value.split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{
-    const match=line.match(/^(\d{2})\/(\d{2})\/(\d{4});\s*(.+)$/);
-    if(!match)throw Error('Feriado inválido: '+line);
-    const iso=`${match[3]}-${match[2]}-${match[1]}`;
-    if(key(fromKey(iso))!==iso||match[4].length>80)throw Error('Feriado inválido: '+line);
-    return {data:iso,nome:match[4]};
-  });
-  return {nome:name,logo_url:logo,cor_primaria:$('#primaryColor').value,tema:$('#theme').value,regras:rules,turnos,cobertura:{geral:numbers($('#coverageGeneral').value),equipes},feriados};
-}
-$('#saveSettings').onclick=async()=>{
-  try{const payload=readSettings();await mutate(()=>saveCompanySettings(payload))}catch(error){toast(explain(error))}
-};
 $('#bCsv').onclick=()=>{
   const [start,end]=bounds(),rows=[['Data','Funcionário','Cargo','Equipe','Situação','Turno','Início','Fim']];
   for(const e of filtered(S.emps))for(let d=fromKey(start);+d<=+fromKey(end);d=add(d,1)){
@@ -377,7 +333,7 @@ document.addEventListener('keydown',ev=>{
   if(ev.shiftKey&&document.activeElement===items[0]){ev.preventDefault();items.at(-1).focus()}
   else if(!ev.shiftKey&&document.activeElement===items.at(-1)){ev.preventDefault();items[0].focus()}
 });
-$('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');$('#bSettings').onclick=()=>showPage('settings');
+$('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');
 $('#bNewEmployee').onclick=()=>{resetForm();$('#employeeFormPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#fN').focus({preventScroll:true})};
 $('#empSearch').addEventListener('input',renderEmployees);$('#empStatus').addEventListener('change',renderEmployees);
 $('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);$('#weekRole').addEventListener('change',render);
