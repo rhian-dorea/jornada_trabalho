@@ -1,7 +1,6 @@
 export const defaults = Object.freeze({
-  nome: 'Controle de Escalas', logo_url: '', cor_primaria: '#146e67', tema: 'light',
-  regras: { dias: 6, domingos: 1, dias_lideranca: 7, domingos_lideranca: 2, interjornada: 11 },
-  turnos: [{ nome: 'Comercial', inicio: '08:00', fim: '17:00', cor: '#146e67' }],
+  nome: 'Controle de Escalas', logo_url: '', cor_primaria: '#173b69', tema: 'light',
+  regras: { dias: 6, domingos: 1, dias_lideranca: 7, domingos_lideranca: 2 },
   cobertura: { geral: [1,1,1,1,1,1,1], equipes: {} }, feriados: []
 });
 
@@ -13,7 +12,6 @@ export function normalizeSettings(value = {}) {
       const number = Number(rules[key]);
       return [key, Number.isInteger(number) && number >= 0 && number <= 24 ? number : fallback];
     })),
-    turnos: Array.isArray(value.turnos) ? value.turnos.filter(x => x?.nome && /^\d\d:\d\d$/.test(x.inicio) && /^\d\d:\d\d$/.test(x.fim)) : defaults.turnos,
     cobertura: { ...defaults.cobertura, ...(value.cobertura || {}), equipes: value.cobertura?.equipes || {} },
     feriados: Array.isArray(value.feriados) ? value.feriados : []
   };

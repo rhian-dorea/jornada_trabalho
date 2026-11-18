@@ -6,7 +6,7 @@ Sistema web para planejar jornadas, consultar quem trabalha em cada dia e acompa
 
 1. **Acesso:** o usuário entra com e-mail e senha. A conta precisa existir no Supabase Auth e ter um perfil ativo na tabela `public.perfis`. O sistema não oferece cadastro público de contas.
 2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. O mês mostra o nome completo de todas as pessoas escaladas para trabalhar em cada dia; as células crescem conforme a equipe. As duas visões usam a mesma busca por nome/cargo e filtros de equipe/cargo. **Hoje** volta ao período atual. Os dias abaixo da cobertura mínima recebem um indicador no próprio calendário.
-3. **Lançamento diário:** clique em um dia do mês ou na célula de um funcionário na semana. O painel do dia mostra as pessoas autorizadas, permite busca e filtros e oferece **Trabalho**, **Folga** e **Remover**, conforme o perfil de acesso.
+3. **Lançamento diário:** clique em um dia do mês para ver todas as pessoas dessa data ou numa célula da semana para ver apenas o funcionário daquela linha. O lançamento oferece **Trabalho**, **Folga** e **Remover**, conforme o perfil de acesso. Nesta versão não há cadastro de horários de jornada.
 4. **Funcionários:** consulte a lista, busque por nome, cargo, equipe ou matrícula e filtre ativos/desativados. O administrador pode usar **Novo funcionário**, editar os dados e desativar ou reativar uma pessoa. A desativação preserva as jornadas anteriores.
 5. **Exportação:** **Exportar CSV** gera os lançamentos do período e filtros atuais em formato UTF-8 compatível com Excel. **Imprimir / PDF** abre a impressão do navegador; escolha “Salvar como PDF”.
 6. **Sincronização:** após uma gravação, o navegador recarrega os dados do banco. Ele também atualiza a aba visível a cada 60 segundos, ao voltar para ela e quando o usuário clica em **Atualizar**.
@@ -32,7 +32,7 @@ Nos dias de descanso necessário ou de exceção, a interface desabilita o botã
 | Cargo comum | Até 6; o 7º é bloqueado. | Para mulheres, o 2º domingo é bloqueado. |
 | Supervisor ou Coordenador | O 7º é permitido com aviso vermelho; o 8º é bloqueado. | O 2º é permitido com aviso vermelho; o 3º é bloqueado, independentemente do sexo. |
 
-Esses limites são os **padrões** armazenados no Supabase. A interjornada padrão é de 11 horas quando ambos os dias têm horários lançados. As verificações consideram viradas de semana, mês e ano, inclusive lançamentos retroativos. Alterar sexo ou cargo é recusado se isso tornar jornadas existentes inválidas. Veja os detalhes em [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md). Essas regras são requisitos operacionais do sistema; não representam uma verificação completa da legislação trabalhista.
+Esses limites são os **padrões** armazenados no Supabase. As verificações consideram viradas de semana, mês e ano, inclusive lançamentos retroativos. Alterar sexo ou cargo é recusado se isso tornar jornadas existentes inválidas. Veja os detalhes em [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md). Essas regras são requisitos operacionais do sistema; não representam uma verificação completa da legislação trabalhista.
 
 ## Perfis de acesso e cargos
 
@@ -99,7 +99,7 @@ Eles cobrem regras de escala, limites configuráveis, cobertura, CSV e migraçã
 | Caminho | Responsabilidade |
 | --- | --- |
 | `index.html`, `css/style.css`, `assets/` | Telas, estilos e identidade visual. |
-| `js/app.js`, `js/rules.js`, `js/settings.js` | Navegação, calendário, regras, cobertura e configurações. |
+| `js/app.js`, `js/calendar-state.js`, `js/rules.js`, `js/settings.js` | Navegação, calendário, regras, cobertura e configurações. |
 | `js/data.js`, `js/config.js` | Comunicação com Supabase e configuração pública. |
 | `js/csv.js`, `js/migration.js` | Utilitários de CSV e migração local, sem controles na interface atual. |
 | `sql/001_schema.sql` a `sql/006_configuracoes_empresa.sql` | Tabelas, segurança, funções transacionais, regras, cargos e configurações. |

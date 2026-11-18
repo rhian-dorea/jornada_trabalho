@@ -1,6 +1,7 @@
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
+import { dayPeople, showCoverageAlert } from './calendar-state.js';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -12,7 +13,8 @@ const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto'
 const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(-2);
-let S={emps:[],rec:{},versions:{},empVersions:{},shift:{},settings:normalizeSettings()};
+let S={emps:[],rec:{},versions:{},empVersions:{},settings:normalizeSettings()};
+const legacyBrandColors=new Set(['#2457a7','#146e67']);
 let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
@@ -23,7 +25,7 @@ function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)'
 function applyBrand(){
   const s=S.settings;
   document.documentElement.dataset.theme=s.tema;
-  const color=s.cor_primaria?.toLowerCase()==='#2457a7' ? defaults.cor_primaria :
+  const color=legacyBrandColors.has(s.cor_primaria?.toLowerCase()) ? defaults.cor_primaria :
     /^#[0-9a-f]{6}$/i.test(s.cor_primaria)?s.cor_primaria:defaults.cor_primaria;
   document.documentElement.style.setProperty('--brand',color);
   const rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);
@@ -61,23 +63,19 @@ const filtered=(emps)=>{
   const query=norm($('#weekSearch').value.trim()),team=$('#weekTeam').value,job=$('#weekRole').value;
   return emps.filter(e=>(!team||e.equipe===team)&&(!job||e.role===job)&&(!query||[e.name,e.role].some(v=>norm(v).includes(query))));
 };
-const teamColors=['#146e67','#7b5b91','#a46638','#426e8c','#945668'];
-function colorFor(e,ds){
-  const shift=S.shift[`${e.id}|${ds}`],configured=S.settings.turnos.find(x=>x.nome===shift?.nome)?.cor;
-  if(configured&&/^#[0-9a-f]{6}$/i.test(configured))return configured.toLowerCase()==='#2457a7'?defaults.cor_primaria:configured;
+const teamColors=['#173b69','#2d5c91','#426e8c','#58628c','#3c7182'];
+function colorFor(e){
   let hash=0;for(const ch of String(e.equipe||e.role))hash=(hash*31+ch.charCodeAt(0))>>>0;
   return teamColors[hash%teamColors.length];
 }
-const timeFor=(id,ds)=>{const shift=S.shift[`${id}|${ds}`];return shift?.inicio&&shift?.fim?shift.inicio+'–'+shift.fim+'h':''};
 const shortReason=reason=>reason.kind==='dias'?`⚠ ${reason.short.match(/\d+/)?.[0]} dias`:`⚠ ${reason.short.match(/\d+/)?.[0]} dom.`;
 function dayGroup(label,list,css,limit){
   if(!list.length)return '';
   const chips=list.slice(0,limit).map(item=>{
     const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
-    const time=item.date?timeFor(e.id,item.date):'';
     const parts=e.name.trim().split(/\s+/),compact=parts.length>1?parts[0]+' '+parts.at(-1)[0]+'.':parts[0];
     const shownName=css==='work'?e.name:compact;
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--shift-color:'+colorFor(e,item.date||'')+'" title="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'">'+esc(shownName)+(time?'<em>'+esc(time)+'</em>':'')+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
+    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(shownName)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
   const remaining=list.length-limit;
   const extra=remaining>0?'<span class="more-count">+'+remaining+' no detalhe</span>':'';
@@ -97,13 +95,13 @@ function render(){
     for(let i=0;i<wks*7;i++){
       const d=add(f,i-f.getDay());
       const emps=filtered(visibleOn(d)),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
-      const workEntries=working.map(e=>({employee:e,date:key(d),warnings:warningsOn(e,d)}));
+      const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
       const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
       const warnings=workEntries.filter(x=>x.warnings.length).length;
       const cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
       const holiday=S.settings.feriados.find(x=>x.data===key(d));
       h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
-        +(cover.missing?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
+        +(showCoverageAlert(working.length,cover.missing)?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
         +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
         +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work',workEntries.length)+dayGroup('✓ Folga',off,'off',1)+dayGroup('⛔ Descanso',blocked,'blocked',1):'<span class="day-empty">—</span>')+'</div>';
     }
@@ -116,20 +114,21 @@ function render(){
     for(let i=0;i<7;i++){
       const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
       const cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
-      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(cover.missing?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
+      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+(count?count+' trabalha'+(count===1?'':'m'):'—')+'</span>'+(showCoverageAlert(count,cover.missing)?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
     }
     h+='</tr></thead><tbody>';
     if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário corresponde aos filtros desta semana.</td></tr>';
     weekEmps.forEach(e=>{
       h+='<tr><th scope="row" class="nm employee-row-header"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></th>';
       for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
-        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" style="--shift-color:'+colorFor(e,key(d))+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" title="'+esc(o.detail||o.t)+'" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(timeFor(e.id,key(d))?'<small class="cell-time">'+esc(timeFor(e.id,key(d)))+'</small>':'')+(o.detail?'<small class="cell-detail">'+esc(o.detail.split(' · ').map(x=>x.includes('domingo')?'⚠ '+(x.match(/\d+/)?.[0]||'2')+' dom.':'⚠ '+(x.match(/\d+/)?.[0]||'7')+' dias').join(' '))+'</small>':'')+'</td>'}
+        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" style="--team-color:'+colorFor(e)+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" title="'+esc(o.detail||o.t)+'" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail.split(' · ').map(x=>x.includes('domingo')?'⚠ '+(x.match(/\d+/)?.[0]||'2')+' dom.':'⚠ '+(x.match(/\d+/)?.[0]||'7')+' dias').join(' '))+'</small>':'')+'</td>'}
       h+='</tr>';
     });
     h+='</tbody></table></div><div class="week-mobile">';
     for(let i=0;i<7;i++){const d=add(s0,i),cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
-      h+='<section class="mobile-day"><h3>'+WD[i]+' · '+fd(d)+(cover.missing?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
-        (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(timeFor(e.id,key(d))?'<small>'+esc(timeFor(e.id,key(d)))+'</small>':'')+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
+      const visibleWorking=weekEmps.filter(e=>W(e.id,d)).length;
+      h+='<section class="mobile-day"><h3>'+WD[i]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
+        (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
     }
     $('#view').innerHTML=h+'</div>';
   }
@@ -183,13 +182,12 @@ async function refresh(){
     if(seq!==loadSeq)return;
     if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
     role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil==='visualizacao'||p.perfil==='funcionario'?'funcionário':p.perfil}`;
-    const rec={},versions={},shift={};
+    const rec={},versions={};
     for(const r of records){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
       versions[`${r.funcionario_id}|${r.data}`]=r.atualizado_em;
-      if(r.turno_nome)shift[`${r.funcionario_id}|${r.data}`]={nome:r.turno_nome,inicio:r.inicio?.slice(0,5),fim:r.fim?.slice(0,5)};
     }
-    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,shift,settings:normalizeSettings(settings||{}),
+    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,settings:normalizeSettings(settings||{}),
       empVersions:Object.fromEntries(emps.map(e=>[e.id,e.atualizado_em]))};
     const selectedTeam=$('#weekTeam').value;
     const teams=[...new Set(S.emps.map(e=>e.equipe).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -200,7 +198,7 @@ async function refresh(){
     $('#weekRole').value=roles.includes(selectedRole)?selectedRole:'';
     applyBrand();
     render();if(page==='employees')cfg();
-    if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
+    if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d,$('#dB').dataset.employee||undefined);
     setSync('Sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error));if(!S.emps.length)$('#view').innerHTML='<div class="empty-state" role="alert"><strong>Não foi possível carregar a escala</strong><p>'+esc(explain(error))+'</p><button id="retryLoad">Tentar novamente</button></div>'}}
 }
@@ -222,15 +220,13 @@ async function setSt(id,ds,v){
     const message=check(e,date);if(message){toast(message);return}
   }
   if(!v && st(id,fromKey(ds)) && !confirm(`Remover o lançamento de ${e.name} em ${ds}?`))return;
-  const selected=$('#dB [data-shift="'+id+'"]')?.value;
   await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
-    ...(v==='T'&&selected?{p_turno:selected}:{}),
     p_versao:S.versions[`${id}|${ds}`]??null}));
 }
 function renderDayRows(ds){
   if(!ds)return;
-  const d=fromKey(ds),query=$('#dSearch').value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR'),filter=$('#dFilter').value;
-  const emps=visibleOn(d).filter(e=>{
+  const d=fromKey(ds),query=$('#dSearch').value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR'),filter=$('#dFilter').value,selectedId=$('#dB').dataset.employee;
+  const emps=dayPeople(visibleOn(d),selectedId).filter(e=>{
     const name=e.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
     if(!name.includes(query))return false;
     const c=st(e.id,d);
@@ -246,22 +242,21 @@ function renderDayRows(ds){
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
     const restriction=reasons.length?'<small class="rule-note">⛔ Descanso obrigatório: '+esc(reasons.map(r=>r.message).join(' · '))+'</small>':'';
     const warning=warnings.length?'<small class="rule-warning">⚠ Aviso: '+esc(warnings.map(r=>r.message).join(' · '))+'</small>':'';
-    const currentShift=S.shift[`${e.id}|${ds}`];
-    const shiftSelect='<label class="shift-control">Turno <select data-shift="'+e.id+'"'+(!can?' disabled':'')+'><option value="">Sem horário</option>'+S.settings.turnos.map(x=>'<option value="'+esc(x.nome)+'"'+(currentShift?.nome===x.nome?' selected':'')+'>'+esc(x.nome)+' · '+x.inicio+'–'+x.fim+'</option>').join('')+'</select></label>';
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b">'+shiftSelect+'<button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
   }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
 }
 function openDay(ds,selectedId){
   if(!ds)return;
-  const opening=$('#ovDay').style.display!=='flex',newDay=$('#dB').dataset.d!==ds;
+  const opening=$('#ovDay').style.display!=='flex',newDay=$('#dB').dataset.d!==ds||$('#dB').dataset.employee!==(selectedId||'');
   if(opening)modalReturnFocus=document.activeElement;
   if(newDay){$('#dSearch').value='';$('#dFilter').value='all'}
-  const d=fromKey(ds),emps=visibleOn(d);
-  $('#dT').textContent=WD[d.getDay()]+', '+fd(d);
+  const d=fromKey(ds),emps=dayPeople(visibleOn(d),selectedId),selectedEmployee=emps[0];
+  $('#ovDay').classList.toggle('single-employee',Boolean(selectedId));
+  $('#dT').textContent=(selectedId&&selectedEmployee?selectedEmployee.name+' · ':'')+WD[d.getDay()]+', '+fd(d);
   const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length,blocked=emps.filter(e=>restrictionsOn(e,d).length).length;
   const warnings=emps.filter(e=>st(e.id,d)==='T'&&warningsOn(e,d).length).length;
   $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off-blocked)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+' necessário'+(blocked===1?'':'s')+'</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
-  $('#dB').dataset.d=ds;renderDayRows(ds);$('#ovDay').style.display='flex';
+  $('#dB').dataset.d=ds;$('#dB').dataset.employee=selectedId||'';renderDayRows(ds);$('#ovDay').style.display='flex';
   if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"][data-s="T"]:not(:disabled)')||$('#dB [data-e="'+selectedId+'"][data-s="F"]:not(:disabled)'):null;(selected||$('#dSearch')).focus()}
 }
 function renderEmployees(){
@@ -300,10 +295,10 @@ function selectRole(value){
 }
 function resetForm(){editId=null;for(const id of ['fN','fM','fE','fROther'])$('#'+id).value='';$('#fR').value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true;updateOtherRoleVisibility()}
 $('#bCsv').onclick=()=>{
-  const [start,end]=bounds(),rows=[['Data','Funcionário','Cargo','Equipe','Situação','Turno','Início','Fim']];
+  const [start,end]=bounds(),rows=[['Data','Funcionário','Cargo','Equipe','Situação']];
   for(const e of filtered(S.emps))for(let d=fromKey(start);+d<=+fromKey(end);d=add(d,1)){
-    const code=st(e.id,d);if(!code)continue;const shift=S.shift[`${e.id}|${key(d)}`]||{};
-    rows.push([d.toLocaleDateString('pt-BR'),e.name,e.role,e.equipe||'',code==='T'?'Trabalho':'Folga',shift.nome||'',shift.inicio||'',shift.fim||'']);
+    const code=st(e.id,d);if(!code)continue;
+    rows.push([d.toLocaleDateString('pt-BR'),e.name,e.role,e.equipe||'',code==='T'?'Trabalho':'Folga']);
   }
   const safe=v=>{const s=String(v??'');return '"'+(/^[=+@\-]/.test(s)?"'":'')+s.replaceAll('"','""')+'"'};
   const blob=new Blob(['\ufeff'+rows.map(row=>row.map(safe).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});

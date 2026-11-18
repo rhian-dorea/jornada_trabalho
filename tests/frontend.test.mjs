@@ -4,6 +4,7 @@ import { validateWork, workWarnings, hasExtendedSchedule, canonicalRole } from '
 import { parseCSV, exportCSV } from '../js/csv.js';
 import { readLegacy } from '../js/migration.js';
 import { normalizeSettings, coverageGap } from '../js/settings.js';
+import { dayPeople, showCoverageAlert } from '../js/calendar-state.js';
 
 const date = s => new Date(`${s}T12:00:00`);
 const work = values => (_id, d) => values.has(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
@@ -87,4 +88,14 @@ test('cobertura soma equipes sem contar duas vezes a falta geral', () => {
   const result=coverageGap(date('2026-11-01'),staff,(id)=>id==='a',settings);
   assert.equal(result.count,1);assert.equal(result.missing,2);
   assert.equal(coverageGap(date('2026-11-01'),staff,(id)=>id==='a',settings,'B').missing,1);
+});
+test('detalhe semanal limita a pessoa da linha; mensal mantém o dia completo', () => {
+  const people=[{id:'a',name:'Ana'},{id:'b',name:'Bruno'}];
+  assert.deepEqual(dayPeople(people,'b'),[people[1]]);
+  assert.deepEqual(dayPeople(people),people);
+});
+test('dia sem trabalhadores não exibe aviso de cobertura', () => {
+  assert.equal(showCoverageAlert(0,1),false);
+  assert.equal(showCoverageAlert(1,1),true);
+  assert.equal(showCoverageAlert(1,0),false);
 });
