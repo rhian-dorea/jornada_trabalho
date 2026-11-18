@@ -28,11 +28,11 @@
 5. Tente `POST`/`PATCH` direto nas tabelas, inclusive `jornadas` e `perfis`: deve falhar por grant/RLS. Tente chamar `salvar_funcionario`, `importar_csv` e `migrar_local` com token sem perfil: deve falhar.
 6. Confira que a auditoria não pode ser editada/excluída via API.
 
-## CSV e migração
+## CSV e migração (rotinas sem interface)
 
-1. Teste CSV válido, vazio, cabeçalho errado, linha incompleta, data impossível, linha repetida, campo malicioso `=...` e arquivo acima de 5000 linhas.
-2. Tente importar lote com uma linha que viola a regra: zero linhas devem ser persistidas. Repita importação válida: sem duplicação. Tente lançamento existente com situação diferente: rejeição.
-3. Migre JSON legado v2 e v1 após baixar backup. Verifique contagens, UUIDs e associação por ID. Repita: zero novos registros. Teste JSON com funcionário sem ID, data inválida, referência ausente e regra violada: rejeição total e armazenamento original intacto.
-4. Interrompa a rede durante importação; a interface não deve afirmar sucesso sem confirmação. Confira no banco se houve commit antes de repetir.
+1. Teste o parser CSV local com arquivo válido, vazio, cabeçalho errado, linha incompleta, data impossível, linha repetida e campo malicioso `=...`. Em projeto de homologação, teste o limite de 5000 linhas da RPC.
+2. Via procedimento administrativo autenticado, chame `importar_csv` com uma linha que viola a regra: zero linhas devem ser persistidas. Repita importação válida: sem duplicação. Tente lançamento existente com situação diferente: rejeição.
+3. Depois de preservar um backup, chame `migrar_local` com JSON legado v2 e v1 em homologação. Verifique contagens, UUIDs e associação por ID. Repita: zero novos registros. Teste JSON com funcionário sem ID, data inválida, referência ausente e regra violada: rejeição total e origem intacta.
+4. Interrompa a rede durante uma chamada administrativa; confira no banco se houve commit antes de repetir. A interface atual não expõe importação, exportação ou migração.
 
 Registre evidências do resultado real antes de declarar prontidão para produção.

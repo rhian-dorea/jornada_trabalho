@@ -1,6 +1,4 @@
-import { db, configured, profile, employees, journeys, allJourneys, all, saveEmployee, saveJourney, importRows, migrateLocal } from './data.js';
-import { parseCSV, exportCSV } from './csv.js';
-import { readLegacy, parseLegacy, backup } from './migration.js';
+import { db, configured, profile, employees, journeys, saveEmployee, saveJourney } from './data.js';
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 
 const $ = s => document.querySelector(s);
@@ -14,7 +12,7 @@ const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1);
 let S={emps:[],rec:{},versions:{},empVersions:{}};
-let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, preview=null, legacy=null, uploadedLegacy=null, migrationReport=null, modalReturnFocus=null;
+let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
 const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W);
@@ -25,12 +23,12 @@ function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)'
 function showPage(nextPage){
   if(!user)return;
   page=nextPage;
-  for(const [name,id,button] of [['schedule','schedulePage','bSchedule'],['employees','employeesPage','bEmployees'],['admin','adminPage','bAdmin']]){
+  for(const [name,id,button] of [['schedule','schedulePage','bSchedule'],['employees','employeesPage','bEmployees']]){
     $('#'+id).hidden=name!==page;
     $('#'+button).classList.toggle('active',name===page);
     if(name===page)$('#'+button).setAttribute('aria-current','page');else $('#'+button).removeAttribute('aria-current');
   }
-  if(page!=='schedule')cfg();
+  if(page==='employees')cfg();
   window.scrollTo({top:0,behavior:'instant'});
 }
 function info(e,d){
@@ -132,9 +130,8 @@ async function refresh(){
   try{
     const [emps,records,p]=await Promise.all([employees(),journeys(start,end),profile(user.id)]);
     if(seq!==loadSeq)return;
-    if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
-    if(role!==p.perfil){$('#csv').value='';$('#auditView').textContent=''}
-    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;$('#bAdmin').textContent=role==='administrador'?'Administração':'Dados e regras';$('#adminTitle').textContent=$('#bAdmin').textContent;
+    if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
+    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
     const rec={},versions={};
     for(const r of records){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
@@ -146,7 +143,7 @@ async function refresh(){
     const teams=[...new Set(S.emps.map(e=>e.equipe).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     $('#weekTeam').replaceChildren(new Option('Todas as equipes',''),...teams.map(name=>new Option(name,name)));
     $('#weekTeam').value=teams.includes(selectedTeam)?selectedTeam:'';
-    render();if(page!=='schedule')cfg();
+    render();if(page==='employees')cfg();
     if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
     setSync('Sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error))}}
@@ -154,7 +151,7 @@ async function refresh(){
 async function mutate(action,onError){
   if(busy)return;
   busy=true;setSync('Salvando…');
-  try{await action();$('#csv').value='';$('#auditView').textContent='';await refresh();toast('Alteração salva no banco.',true)}
+  try{await action();await refresh();toast('Alteração salva no banco.',true)}
   catch(error){onError?.(error);toast(explain(error));await refresh()}
   finally{busy=false}
 }
@@ -221,18 +218,7 @@ function cfg(){
   $('#employeeFormPanel').hidden=role!=='administrador';
   $('#bNewEmployee').hidden=role!=='administrador';
   updateOtherRoleVisibility();
-  $('#adminTools').hidden=role!=='administrador';
-  $('#bExp').disabled=role==='visualizacao';$('#bCp').disabled=role==='visualizacao';$('#bDownload').disabled=role==='visualizacao';
-  if(page!=='admin')return;
-  try{
-    legacy=uploadedLegacy||readLegacy();
-    $('#migrationPreview').textContent=migrationReport|| (legacy
-      ? `${legacy.origin}: ${legacy.emps.length} funcionário(s), ${legacy.journeys.length} lançamento(s). ${legacy.errors.length} erro(s). Confira se há dados de demonstração antes de migrar. ${legacy.errors.slice(0,5).join(' | ')}`
-      : 'Nenhum dado local antigo encontrado.');
-    $('#bBackup').disabled=!legacy;$('#bMigrate').disabled=!legacy||!!legacy.errors.length||!backupDone||backupRaw!==legacy.raw;
-  }catch(error){legacy=null;$('#migrationPreview').textContent=explain(error);$('#bBackup').disabled=true;$('#bMigrate').disabled=true}
 }
-let backupDone=false,backupRaw=null;
 const defaultRoles=['Despachante','Supervisor','Coordenador','Analista'];
 function populateRoleOptions(){
   const select=$('#fR'),current=select.value;
@@ -265,7 +251,7 @@ $('#dSearch').addEventListener('input',()=>renderDayRows($('#dB').dataset.d));
 $('#dFilter').addEventListener('change',()=>renderDayRows($('#dB').dataset.d));
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{$('#'+b.dataset.close).style.display='none';modalReturnFocus?.focus()});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('#ovDay').style.display==='flex'){$('#ovDay').style.display='none';modalReturnFocus?.focus()}});
-$('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');$('#bAdmin').onclick=()=>showPage('admin');
+$('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');
 $('#bNewEmployee').onclick=()=>{resetForm();$('#employeeFormPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#fN').focus({preventScroll:true})};
 $('#empSearch').addEventListener('input',renderEmployees);$('#empStatus').addEventListener('change',renderEmployees);
 $('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);
@@ -294,72 +280,18 @@ $('#bAdd').onclick=async()=>{
     p_versao:editId?S.empVersions[editId]:null};
   await mutate(async()=>{await saveEmployee(payload);resetForm()});
 };
-async function prepareExport(){
-  if(role==='visualizacao')return;
-  const seq=loadSeq;
-  setSync('Preparando CSV…');
-  try{const rows=await allJourneys();if(!user||role==='visualizacao'||seq!==loadSeq)return;
-    $('#csv').value=exportCSV(S.emps.map(e=>({...e,cargo:e.role})),rows);setSync('CSV preparado');toast('CSV preparado.',true)}
-  catch(error){setSync('Falha na exportação',true);toast(explain(error))}
-}
-$('#bExp').onclick=prepareExport;
-$('#bCp').onclick=async()=>{if(!$('#csv').value)await prepareExport();if(!$('#csv').value)return;
-  try{await navigator.clipboard.writeText($('#csv').value);toast('Copiado.',true)}
-  catch{const t=$('#csv');t.select();if(document.execCommand('copy'))toast('Copiado.',true);else toast('Não foi possível copiar. Use o botão Baixar CSV.')}
-};
-$('#bDownload').onclick=async()=>{
-  if(!$('#csv').value)await prepareExport();if(!$('#csv').value)return;
-  const url=URL.createObjectURL(new Blob([$('#csv').value],{type:'text/csv;charset=utf-8'}));
-  const a=document.createElement('a');a.href=url;a.download='escalas.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
-};
-$('#imp').addEventListener('input',()=>{preview=null;$('#bImp').disabled=true});
-$('#bPreview').onclick=()=>{
-  preview=parseCSV($('#imp').value);
-  $('#importPreview').textContent=`${preview.rows.length} linha(s) válida(s); ${preview.errors.length} erro(s). ${preview.errors.slice(0,10).join(' | ')}`;
-  $('#bImp').disabled=!preview.rows.length||!!preview.errors.length;
-};
-$('#bImp').onclick=async()=>{
-  if(!preview||preview.errors.length||!preview.rows.length||role!=='administrador')return;
-  if(!confirm(`Importar ${preview.rows.length} linha(s)? A operação será integral.`))return;
-  await mutate(async()=>{
-    const result=await importRows(preview.rows.map(row=>({...row,cargo:canonicalRole(row.cargo)})));
-    $('#importPreview').textContent=`Importação concluída: ${result.linhas} linha(s), ${result.funcionarios_novos} funcionário(s) novo(s).`;
-    $('#imp').value='';preview=null;$('#bImp').disabled=true;
-  },error=>{$('#importPreview').textContent=`Lote rejeitado sem alterações: ${explain(error)}`});
-};
-$('#legacyFile').addEventListener('change',async ev=>{
-  const file=ev.target.files?.[0];if(!file)return;
-  try{uploadedLegacy=parseLegacy(await file.text(),file.name.includes('escala_dsr_v1')?'escala_dsr_v1':'escala_dsr_v2');backupDone=false;backupRaw=null;migrationReport=null;cfg()}
-  catch(error){uploadedLegacy=null;$('#migrationPreview').textContent=explain(error);$('#bMigrate').disabled=true}
-});
-$('#bBackup').onclick=()=>{if(legacy){backup(legacy);backupDone=true;backupRaw=legacy.raw;$('#bMigrate').disabled=!!legacy.errors.length;toast('Backup solicitado. Confira o arquivo baixado antes de migrar.',true)}};
-$('#bMigrate').onclick=async()=>{
-  if(!legacy||!backupDone||backupRaw!==legacy.raw||legacy.errors.length||role!=='administrador')return;
-  if(!confirm(`Migrar ${legacy.emps.length} funcionário(s) e ${legacy.journeys.length} lançamento(s)? O armazenamento original será preservado.`))return;
-  await mutate(async()=>{const result=await migrateLocal(legacy.origin,legacy.emps.map(e=>({...e,cargo:canonicalRole(e.cargo)})),legacy.journeys);
-    migrationReport=`Migração concluída: ${result.funcionarios_novos} funcionário(s) e ${result.jornadas_novas} jornada(s) novos. Dados locais preservados.`;
-    $('#migrationPreview').textContent=migrationReport;
-  },error=>{migrationReport=`Lote rejeitado sem alterações: ${explain(error)}`;$('#migrationPreview').textContent=migrationReport});
-};
-$('#bAudit').onclick=async()=>{
-  const seq=loadSeq;
-  try{const rows=await all('auditoria','usuario_id,operacao,tabela,registro_id,criado_em,valores_anteriores,valores_novos',q=>q.order('criado_em',{ascending:false}).limit(100));
-    if(!user||role!=='administrador'||seq!==loadSeq)return;
-    $('#auditView').innerHTML=rows.slice(0,100).map(r=>`<details><summary>${esc(new Date(r.criado_em).toLocaleString('pt-BR'))} · ${esc(r.operacao)} ${esc(r.tabela)} · ${esc(r.registro_id)} · ${esc(r.usuario_id||'SQL administrativo')}</summary><pre>Antes: ${esc(JSON.stringify(r.valores_anteriores))}\nDepois: ${esc(JSON.stringify(r.valores_novos))}</pre></details>`).join('')||'Sem alterações.';
-  }catch(error){toast(explain(error))}
-};
 async function showSession(){
   const {data:{user:current},error}=await db.auth.getUser();
-  if(error||!current){user=null;role=null;loadSeq++;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#bReload').hidden=true;$('#bOut').hidden=true;$('#user').textContent='';setSync('Aguardando login');return}
+  if(error||!current){user=null;role=null;loadSeq++;S={emps:[],rec:{},versions:{},empVersions:{}};$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#bReload').hidden=true;$('#bOut').hidden=true;$('#user').textContent='';setSync('Aguardando login');return}
   try{
     const p=await profile(current.id);
     if(!p||!p.ativo)throw new Error('Conta sem perfil ativo. Solicite acesso ao administrador.');
-    if(user?.id!==current.id){S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';page='schedule'}
+    if(user?.id!==current.id){S={emps:[],rec:{},versions:{},empVersions:{}};page='schedule'}
     user=current;role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
     $('#main').hidden=false;$('#mainNav').hidden=false;$('#ovLogin').style.display='none';$('#loginError').textContent='';
     $('#bReload').hidden=false;$('#bOut').hidden=false;showPage(page);
     await refresh();
-  }catch(e){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#csv').value='';$('#auditView').textContent='';$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent=explain(e);setSync('Acesso indisponível',true)}
+  }catch(e){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent=explain(e);setSync('Acesso indisponível',true)}
 }
 $('#loginForm').addEventListener('submit',async ev=>{
   ev.preventDefault();if(!configured)return;

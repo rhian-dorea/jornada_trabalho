@@ -13,7 +13,7 @@
   <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bOut" hidden>Sair</button></div>
 </header>
 <nav class="main-nav" id="mainNav" aria-label="Navegação principal" hidden>
-  <div class="main-nav-inner"><button id="bSchedule" class="active" aria-current="page">Escalas</button><button id="bEmployees">Funcionários</button><button id="bAdmin">Administração</button></div>
+  <div class="main-nav-inner"><button id="bSchedule" class="active" aria-current="page">Escalas</button><button id="bEmployees">Funcionários</button></div>
 </nav>
 <main id="main" hidden>
   <div class="page-section" id="schedulePage">
@@ -33,18 +33,6 @@
     <div class="management-layout">
       <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Diretório</span><h3>Equipe cadastrada</h3></div></div><div class="employee-filters"><div><label for="empSearch">Buscar funcionário</label><input id="empSearch" type="search" placeholder="Nome, cargo ou equipe" autocomplete="off"></div><div><label for="empStatus">Situação</label><select id="empStatus"><option value="active">Ativos</option><option value="all">Todos</option><option value="inactive">Desativados</option></select></div></div><div id="list" class="employee-list"></div></section>
       <section class="panel management-panel form-panel" id="employeeFormPanel"><div class="panel-heading"><div><span class="eyebrow">Cadastro</span><h3 id="fT">Adicionar funcionário</h3></div></div><div class="form-grid"><div><label for="fN">Nome</label><input id="fN" maxlength="60"></div><div><label for="fS">Sexo</label><select id="fS"><option value="M">Homem</option><option value="F">Mulher</option></select></div><div><label for="fR">Cargo</label><select id="fR"><option value="">Selecione</option><option>Despachante</option><option>Supervisor</option><option>Coordenador</option><option>Analista</option><option value="__other__">+ Adicionar outro cargo</option></select></div><div id="otherRoleWrap" hidden><label for="fROther">Novo cargo</label><input id="fROther" maxlength="40" placeholder="Digite o nome do cargo"></div><div><label for="fM">Matrícula (opcional)</label><input id="fM" maxlength="80"></div><div><label for="fE">Equipe (opcional)</label><input id="fE" maxlength="80"></div><div><label for="fA">Situação</label><select id="fA"><option value="true">Ativo</option><option value="false">Desativado</option></select></div></div><div class="form-actions"><button class="p" id="bAdd">Adicionar</button><button id="bCan" hidden>Cancelar edição</button></div></section>
-    </div>
-  </section>
-  <section class="page-section" id="adminPage" hidden>
-    <div class="page-heading"><div><span class="eyebrow">Gestão de dados</span><h2 id="adminTitle">Administração</h2><p>Consulte as regras e gerencie os registros autorizados.</p></div></div>
-    <div class="admin-layout">
-      <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Escalas</span><h3>Regras aplicadas</h3></div></div><ul class="rules"><li>Cargos comuns: até 6 dias seguidos. Supervisor e Coordenador: o 7º dia é permitido com aviso vermelho; o 8º é bloqueado.</li><li>Mulheres em cargos comuns não podem trabalhar 2 domingos seguidos. Supervisor e Coordenador podem trabalhar 2, com aviso vermelho; o 3º é bloqueado.</li><li>A sequência é conferida pelas datas, inclusive na virada de mês. Dia sem lançamento não conta como trabalhado.</li></ul></section>
-      <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Saída de dados</span><h3>Exportar registros</h3></div></div><p>Inclui todo o histórico autorizado.</p><textarea id="csv" readonly aria-label="CSV para exportar"></textarea><div class="form-actions"><button id="bExp">Preparar CSV</button><button id="bCp">Copiar</button><button id="bDownload">Baixar CSV</button></div></section>
-      <div id="adminTools" class="admin-extra">
-        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Entrada de dados</span><h3>Importar registros</h3></div></div><p>Revise as linhas antes de confirmar a importação.</p><textarea id="imp" placeholder="Funcionario;Sexo;Cargo;Data;Registro" aria-label="CSV para importar"></textarea><div class="form-actions"><button id="bPreview">Prévia</button><button id="bImp" disabled>Confirmar importação</button></div><div id="importPreview" role="status"></div></section>
-        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Histórico</span><h3>Migração do navegador</h3></div></div><label for="legacyFile">JSON de backup da origem antiga (opcional)</label><input id="legacyFile" type="file" accept=".json,application/json"><div id="migrationPreview" role="status"></div><div class="form-actions"><button id="bBackup">Baixar backup</button><button id="bMigrate">Confirmar migração</button></div></section>
-        <section class="panel management-panel"><div class="panel-heading"><div><span class="eyebrow">Rastreabilidade</span><h3>Auditoria</h3></div></div><button id="bAudit">Consultar alterações recentes</button><div id="auditView"></div></section>
-      </div>
     </div>
   </section>
 </main>

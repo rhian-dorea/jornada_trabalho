@@ -7,7 +7,7 @@
 - O cadastro usa apenas Supervisor e Coordenador como nomes padrão. Cargos antigos no feminino são exibidos com o nome masculino e o script `005_normalizar_cargos.sql` atualiza os registros existentes no banco.
 - Gravação, alteração e remoção passam pelos mesmos gatilhos. Uma folga ou exclusão de lançamento não é contabilizada como trabalho. A auditoria registra correções e remoções.
 - Lançamentos simultâneos para o mesmo funcionário são serializados em uma transação. `atualizado_em` detecta conflito quando a versão lida não corresponde mais à versão atual.
-- Importação CSV e migração local são transações únicas: qualquer violação reverte o lote. A interface mostra o erro retornado; corrija a entrada e repita.
+- As funções SQL de importação CSV e migração local permanecem disponíveis para procedimentos administrativos, sem controles na interface atual. Cada lote é uma transação única: qualquer violação reverte o lote.
 - Funcionário desativado preserva o histórico. Somente administrador pode corrigir lançamento histórico já existente; novos lançamentos exigem reativação.
 
 Essas regras são requisitos operacionais do sistema e não representam, isoladamente, verificação de toda a legislação trabalhista.

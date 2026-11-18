@@ -10,7 +10,7 @@ Dependências originais: `importCSV → check → run/W/st`; `setSt → check/sa
 
 ## Implementação atual
 
-`index.html` e o CSS mantêm a identidade visual. `app.js` preserva o algoritmo de exibição e a interação; `data.js` isola consultas e RPCs; `csv.js` e `migration.js` tratam entrada/saída; `rules.js` faz pré-validação. A confirmação decisiva ocorre em `sql/003_business_rules.sql`. O HTML original permanece somente no workspace, ignorado pelo Git por conter dados de demonstração.
+`index.html` e o CSS oferecem as telas de Escalas e Funcionários. `app.js` controla a exibição e as interações; `data.js` isola consultas e RPCs; `rules.js` faz pré-validação. `csv.js` e `migration.js` continuam no repositório como utilitários, sem controles na interface atual. A confirmação decisiva ocorre em `sql/003_business_rules.sql`, atualizado por `004_cargos_excecoes.sql`. O HTML original permanece somente no workspace, ignorado pelo Git por conter dados de demonstração.
 
 Fluxo: Supabase Auth autentica o usuário → `perfis` determina papel e estado ativo → RLS filtra funcionários/jornadas por equipe → consulta paginada pelo período, com margem de quatorze dias para cobrir três domingos consecutivos → calendário. A cada gravação, uma RPC verifica papel e equipe, serializa a operação por funcionário com advisory lock, compara `atualizado_em`, altera o registro e aciona os gatilhos de validação e auditoria. Erro causa rollback da transação. A interface só mostra sucesso após a RPC responder. Dados são recarregados a cada minuto e ao voltar à aba; o botão Atualizar permite recarga imediata. Realtime foi dispensado para manter configuração e superfície de acesso menores; o atraso esperado é de até um minuto enquanto a aba está visível.
 
