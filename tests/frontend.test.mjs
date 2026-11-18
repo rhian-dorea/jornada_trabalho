@@ -107,6 +107,6 @@ test('resumo mensal separa folga, descanso calculado e ausência de lançamento'
   const read=(_id,d)=>statuses.get(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)||'';
   const reasons=(_employee,d)=>d.getDate()===3?[{kind:'dias'},{kind:'domingo'}]:d.getDate()===4?[{kind:'dias'}]:[];
   assert.deepEqual(summarizeEmployeeMonth(emp,dates,read,reasons),{
-    worked:1,notWorked:3,off:1,rest:2,restDays:2,restSundays:1,unplanned:1
+    worked:1,notWorked:4,off:1,rest:2,restDays:2,restSundays:1,unplanned:1
   });
 });

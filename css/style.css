@@ -358,15 +358,20 @@ td.t .cell-status { border-left-width: 3px; border-left-style: solid; }
 .month-summary-scroll { max-height: 286px; overflow: auto; border-top: 1px solid var(--bd); }
 .month-summary table { min-width: 690px; }
 .month-summary th, .month-summary td { min-width: 88px; padding: 8px 10px; font-size: 11px; line-height: 1.2; }
-.month-summary thead th { z-index: 4; background: var(--soft); color: var(--mut); font-size: 10px; white-space: nowrap; }
+.month-summary thead th { z-index: 4; background: #173b69; color: #fff; font-size: 10px; white-space: nowrap; padding-top: 12px; padding-bottom: 12px; }
 .month-summary tbody th { position: static; min-width: 170px; background: var(--card); color: var(--navy); text-align: left; letter-spacing: 0; text-transform: none; }
 .month-summary tbody tr:nth-child(even) th, .month-summary tbody tr:nth-child(even) td { background: var(--soft); }
 .month-summary tbody th .summary-name { display: block; font-size: 11px; font-weight: 750; overflow-wrap: anywhere; }
 .month-summary tbody th small { display: block; margin-top: 2px; color: var(--mut); font-size: 10px; font-weight: 500; }
 .month-summary td { font-variant-numeric: tabular-nums; font-weight: 650; }
 .month-summary .summary-worked { color: var(--tbt); font-weight: 800; }
-.month-summary .summary-not-worked { color: var(--dg); font-weight: 800; }
-.month-summary .summary-unplanned { color: var(--mut); }
+.month-summary .summary-not-worked { color: var(--navy); background: var(--tb); font-weight: 800; }
+.month-summary tbody tr:nth-child(even) .summary-not-worked { background: var(--tb); }
+.summary-value { display: inline-grid; place-items: center; min-width: 30px; min-height: 26px; padding: 3px 7px; border-radius: 7px; }
+.summary-value.off { background: var(--fb); color: var(--fbt); }
+.summary-value.rest { background: var(--dgb); color: var(--dg); }
+.summary-value.sunday { background: var(--tb); color: var(--tbt); }
+.month-summary tbody tr:hover th, .month-summary tbody tr:hover td { box-shadow: inset 0 1px var(--bd), inset 0 -1px var(--bd); }
 .month-summary-empty { margin: 0; padding: 15px 16px; border-top: 1px solid var(--bd); color: var(--mut); font-size: 12px; }
 .month-summary-scroll:focus-visible { outline: 3px solid #79a8db; outline-offset: -3px; }
 .week-mobile { display: none; }
