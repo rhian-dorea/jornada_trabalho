@@ -2,6 +2,7 @@ import { db, configured, profile, employees, journeys, saveEmployee, saveJourney
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 import { dayPeople, showCoverageAlert } from './calendar-state.js';
+import { summarizeEmployeeMonth } from './monthly-summary.js';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -58,10 +59,9 @@ function info(e,d){
   return{c:'z',t:'—',detail:''};
 }
 const visibleOn=d=>S.emps.filter(e=>e.ativo||st(e.id,d));
-const norm=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
 const filtered=(emps)=>{
-  const query=norm($('#weekSearch').value.trim()),team=$('#weekTeam').value,job=$('#weekRole').value;
-  return emps.filter(e=>(!team||e.equipe===team)&&(!job||e.role===job)&&(!query||[e.name,e.role].some(v=>norm(v).includes(query))));
+  const team=$('#weekTeam').value,job=$('#weekRole').value;
+  return emps.filter(e=>(!team||e.equipe===team)&&(!job||e.role===job));
 };
 const teamColors=['#173b69','#2d5c91','#426e8c','#58628c','#3c7182'];
 function colorFor(e){
@@ -69,20 +69,29 @@ function colorFor(e){
   return teamColors[hash%teamColors.length];
 }
 const shortReason=reason=>reason.kind==='dias'?`⚠ ${reason.short.match(/\d+/)?.[0]} dias`:`⚠ ${reason.short.match(/\d+/)?.[0]} dom.`;
-function dayGroup(label,list,css,limit){
+function dayGroup(label,list,css){
   if(!list.length)return '';
-  const chips=list.slice(0,limit).map(item=>{
+  const chips=list.map(item=>{
     const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
-    const parts=e.name.trim().split(/\s+/),compact=parts.length>1?parts[0]+' '+parts.at(-1)[0]+'.':parts[0];
-    const shownName=css==='work'?e.name:compact;
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(shownName)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
+    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
-  const remaining=list.length-limit;
-  const extra=remaining>0?'<span class="more-count">+'+remaining+' no detalhe</span>':'';
-  return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+extra+'</div></div>';
+  return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+'</div></div>';
+}
+function renderMonthSummary(){
+  const y=D.getFullYear(),m=D.getMonth(),days=new Date(y,m+1,0).getDate();
+  const dates=Array.from({length:days},(_,i)=>new Date(y,m,i+1));
+  const emps=filtered(S.emps.filter(e=>e.ativo||dates.some(d=>st(e.id,d))));
+  const title='<div class="month-summary-head"><div><span class="eyebrow">Por funcionário</span><h3>Resumo de '+MN[m].toLocaleLowerCase('pt-BR')+' de '+y+'</h3></div><span class="month-summary-count">'+emps.length+' pessoa'+(emps.length===1?'':'s')+'</span></div>';
+  const note='<p class="month-summary-note">Não trabalhou = Folga + descanso obrigatório. Dias sem lançamento aparecem à parte. Um descanso pode ter os dois motivos.</p>';
+  const rows=emps.map(e=>{
+    const s=summarizeEmployeeMonth(e,dates,st,restrictionsOn);
+    return '<tr><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td class="summary-worked">'+s.worked+'</td><td class="summary-not-worked">'+s.notWorked+'</td><td>'+s.off+'</td><td>'+s.restDays+'</td><td>'+s.restSundays+'</td><td class="summary-unplanned">'+s.unplanned+'</td></tr>';
+  }).join('');
+  $('#monthSummary').innerHTML=title+note+(emps.length?'<div class="month-summary-scroll" role="region" aria-label="Totais mensais por funcionário" tabindex="0"><table><thead><tr><th scope="col">Funcionário</th><th scope="col">Trabalhou</th><th scope="col">Não trabalhou</th><th scope="col">Folga</th><th scope="col">Descanso<br>por dias</th><th scope="col">Descanso<br>por domingos</th><th scope="col">Sem lançamento</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="month-summary-empty">Nenhum funcionário corresponde aos filtros.</p>');
 }
 function render(){
   const t=today();let y=D.getFullYear(),m=D.getMonth(),from,to;
+  renderMonthSummary();
   if(!S.emps.length){
     $('#ttl').textContent=MN[m]+' '+y;
     $('#view').innerHTML='<div class="empty-state"><strong>Equipe ainda não cadastrada</strong><p>Abra Funcionários para adicionar a primeira pessoa à escala.</p></div>';
@@ -103,7 +112,7 @@ function render(){
       h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
         +(showCoverageAlert(working.length,cover.missing)?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
         +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
-        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work',workEntries.length)+dayGroup('✓ Folga',off,'off',1)+dayGroup('⛔ Descanso',blocked,'blocked',1):'<span class="day-empty">—</span>')+'</div>';
+        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off,'off')+dayGroup('⛔ Descanso',blocked,'blocked'):'<span class="day-empty">—</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
@@ -294,18 +303,6 @@ function selectRole(value){
   updateOtherRoleVisibility();
 }
 function resetForm(){editId=null;for(const id of ['fN','fM','fE','fROther'])$('#'+id).value='';$('#fR').value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true;updateOtherRoleVisibility()}
-$('#bCsv').onclick=()=>{
-  const [start,end]=bounds(),rows=[['Data','Funcionário','Cargo','Equipe','Situação']];
-  for(const e of filtered(S.emps))for(let d=fromKey(start);+d<=+fromKey(end);d=add(d,1)){
-    const code=st(e.id,d);if(!code)continue;
-    rows.push([d.toLocaleDateString('pt-BR'),e.name,e.role,e.equipe||'',code==='T'?'Trabalho':'Folga']);
-  }
-  const safe=v=>{const s=String(v??'');return '"'+(/^[=+@\-]/.test(s)?"'":'')+s.replaceAll('"','""')+'"'};
-  const blob=new Blob(['\ufeff'+rows.map(row=>row.map(safe).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`escala-${key(D)}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-};
-$('#bPrint').onclick=()=>window.print();
-
 $('#view').addEventListener('click',ev=>{
   if(ev.target.id==='retryLoad'){refresh();return}
   const c=ev.target.closest('[data-e]'),dy=ev.target.closest('[data-day]');
@@ -329,7 +326,7 @@ document.addEventListener('keydown',ev=>{
 $('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');
 $('#bNewEmployee').onclick=()=>{resetForm();$('#employeeFormPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#fN').focus({preventScroll:true})};
 $('#empSearch').addEventListener('input',renderEmployees);$('#empStatus').addEventListener('change',renderEmployees);
-$('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);$('#weekRole').addEventListener('change',render);
+$('#weekTeam').addEventListener('change',render);$('#weekRole').addEventListener('change',render);
 $('#tM').onclick=()=>{mode='m';refresh()};$('#tW').onclick=()=>{mode='w';refresh()};
 $('#pv').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()-1,1):add(D,-7);refresh()};
 $('#nx').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()+1,1):add(D,7);refresh()};

@@ -5,10 +5,10 @@ Sistema web para planejar jornadas, consultar quem trabalha em cada dia e acompa
 ## Como o sistema funciona
 
 1. **Acesso:** o usuário entra com e-mail e senha. A conta precisa existir no Supabase Auth e ter um perfil ativo na tabela `public.perfis`. O sistema não oferece cadastro público de contas.
-2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. O mês mostra o nome completo de todas as pessoas escaladas para trabalhar em cada dia; as células crescem conforme a equipe. As duas visões usam a mesma busca por nome/cargo e filtros de equipe/cargo. **Hoje** volta ao período atual. Os dias abaixo da cobertura mínima recebem um indicador no próprio calendário.
+2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. O mês mostra o nome completo de todas as pessoas em Trabalho, Folga e Descanso obrigatório; as células crescem conforme a equipe. As duas visões usam filtros de equipe e cargo. **Hoje** volta ao período atual. Os dias abaixo da cobertura mínima recebem um indicador no próprio calendário.
 3. **Lançamento diário:** clique em um dia do mês para ver todas as pessoas dessa data ou numa célula da semana para ver apenas o funcionário daquela linha. O lançamento oferece **Trabalho**, **Folga** e **Remover**, conforme o perfil de acesso. Nesta versão não há cadastro de horários de jornada.
 4. **Funcionários:** consulte a lista, busque por nome, cargo, equipe ou matrícula e filtre ativos/desativados. O administrador pode usar **Novo funcionário**, editar os dados e desativar ou reativar uma pessoa. A desativação preserva as jornadas anteriores.
-5. **Exportação:** **Exportar CSV** gera os lançamentos do período e filtros atuais em formato UTF-8 compatível com Excel. **Imprimir / PDF** abre a impressão do navegador; escolha “Salvar como PDF”.
+5. **Resumo mensal:** acima do calendário, cada funcionário tem totais de Trabalho, Não trabalhou, Folga, Descanso por dias seguidos, Descanso por domingos e Sem lançamento. O total **Não trabalhou** soma Folga e Descanso obrigatório calculado. Um mesmo descanso pode ter os dois motivos, mas entra apenas uma vez no total. A tabela aceita rolagem quando há muitos funcionários.
 6. **Sincronização:** após uma gravação, o navegador recarrega os dados do banco. Ele também atualiza a aba visível a cada 60 segundos, ao voltar para ela e quando o usuário clica em **Atualizar**.
 
 A pré-validação no navegador mostra bloqueios e avisos rapidamente. Cada alteração passa novamente pelas funções SQL do banco, que conferem permissões, regras e versão do registro antes de confirmar. Se duas pessoas editarem o mesmo registro, a versão antiga provoca um conflito para revisão em vez de sobrescrever a alteração mais recente.
@@ -74,7 +74,7 @@ Navegador → função SQL (RPC) → permissão + versão + regras → gravaçã
 
 O PostgreSQL guarda funcionários, jornadas, perfis, equipes autorizadas e auditoria. As políticas de **Row Level Security (RLS)** filtram as leituras. As funções SQL conferem o perfil e a equipe, validam a escala e comparam a versão do registro. Uma falha reverte a operação. A auditoria é gravada no banco, mas não há uma tela de consulta à auditoria nesta versão; a consulta administrativa pode ser feita no Supabase.
 
-O navegador não usa `localStorage` como fonte dos dados operacionais; a sessão de autenticação é gerenciada pelo SDK do Supabase. Os arquivos `js/csv.js` e `js/migration.js` e as funções SQL correspondentes permanecem no repositório para compatibilidade. A exportação CSV da interface contém os lançamentos visíveis; não substitui um backup completo do banco.
+O navegador não usa `localStorage` como fonte dos dados operacionais; a sessão de autenticação é gerenciada pelo SDK do Supabase. Os arquivos `js/csv.js` e `js/migration.js` e as funções SQL correspondentes permanecem no repositório para compatibilidade, sem controles de exportação na interface.
 
 ### Limite para uso por várias empresas
 
@@ -99,7 +99,7 @@ Eles cobrem regras de escala, limites configuráveis, cobertura, CSV e migraçã
 | Caminho | Responsabilidade |
 | --- | --- |
 | `index.html`, `css/style.css`, `assets/` | Telas, estilos e identidade visual. |
-| `js/app.js`, `js/calendar-state.js`, `js/rules.js`, `js/settings.js` | Navegação, calendário, regras, cobertura e configurações. |
+| `js/app.js`, `js/calendar-state.js`, `js/monthly-summary.js`, `js/rules.js`, `js/settings.js` | Navegação, calendário, resumo mensal, regras, cobertura e configurações. |
 | `js/data.js`, `js/config.js` | Comunicação com Supabase e configuração pública. |
 | `js/csv.js`, `js/migration.js` | Utilitários de CSV e migração local, sem controles na interface atual. |
 | `sql/001_schema.sql` a `sql/006_configuracoes_empresa.sql` | Tabelas, segurança, funções transacionais, regras, cargos e configurações. |

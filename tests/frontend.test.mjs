@@ -5,6 +5,7 @@ import { parseCSV, exportCSV } from '../js/csv.js';
 import { readLegacy } from '../js/migration.js';
 import { normalizeSettings, coverageGap } from '../js/settings.js';
 import { dayPeople, showCoverageAlert } from '../js/calendar-state.js';
+import { summarizeEmployeeMonth } from '../js/monthly-summary.js';
 
 const date = s => new Date(`${s}T12:00:00`);
 const work = values => (_id, d) => values.has(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
@@ -98,4 +99,14 @@ test('dia sem trabalhadores não exibe aviso de cobertura', () => {
   assert.equal(showCoverageAlert(0,1),false);
   assert.equal(showCoverageAlert(1,1),true);
   assert.equal(showCoverageAlert(1,0),false);
+});
+
+test('resumo mensal separa folga, descanso calculado e ausência de lançamento', () => {
+  const dates=['2026-11-01','2026-11-02','2026-11-03','2026-11-04','2026-11-05'].map(date);
+  const statuses=new Map([['2026-11-01','T'],['2026-11-02','F']]);
+  const read=(_id,d)=>statuses.get(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)||'';
+  const reasons=(_employee,d)=>d.getDate()===3?[{kind:'dias'},{kind:'domingo'}]:d.getDate()===4?[{kind:'dias'}]:[];
+  assert.deepEqual(summarizeEmployeeMonth(emp,dates,read,reasons),{
+    worked:1,notWorked:3,off:1,rest:2,restDays:2,restSundays:1,unplanned:1
+  });
 });

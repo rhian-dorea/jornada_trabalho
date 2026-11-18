@@ -23,8 +23,9 @@
       <div class="section-intro"><span class="eyebrow">Planejamento da equipe</span><h2>Calendário de trabalho</h2><p>Veja quem trabalha, quem está de folga e os descansos exigidos. Selecione um dia para ajustar a escala.</p></div>
       <div class="tabs" role="group" aria-label="Modo de visualização"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
     </div>
-    <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="export-actions"><button id="bCsv">Exportar CSV</button><button id="bPrint">Imprimir / PDF</button></div></div>
-    <div class="week-tools" id="weekTools"><div><label for="weekSearch">Buscar nome ou cargo</label><input id="weekSearch" type="search" placeholder="Nome ou cargo" autocomplete="off"></div><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><div><label for="weekRole">Cargo</label><select id="weekRole"><option value="">Todos os cargos</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
+    <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div></div>
+    <div class="week-tools" id="weekTools"><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><div><label for="weekRole">Cargo</label><select id="weekRole"><option value="">Todos os cargos</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
+    <section id="monthSummary" class="month-summary" aria-label="Resumo mensal por funcionário"></section>
     <div class="lg" aria-label="Legenda"><span class="lg-work">● Trabalho</span><span class="lg-off">✓ Folga</span><span class="lg-blocked">⛔ Descanso obrigatório</span><span class="lg-warning">⚠ Aviso</span><span>— Sem lançamento</span></div>
     <div id="view"></div>
     </section>
