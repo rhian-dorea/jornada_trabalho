@@ -23,7 +23,8 @@ function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)'
 function applyBrand(){
   const s=S.settings;
   document.documentElement.dataset.theme=s.tema;
-  const color=/^#[0-9a-f]{6}$/i.test(s.cor_primaria)?s.cor_primaria:defaults.cor_primaria;
+  const color=s.cor_primaria?.toLowerCase()==='#2457a7' ? defaults.cor_primaria :
+    /^#[0-9a-f]{6}$/i.test(s.cor_primaria)?s.cor_primaria:defaults.cor_primaria;
   document.documentElement.style.setProperty('--brand',color);
   const rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);
   document.documentElement.style.setProperty('--brand-text',rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#111827':'#ffffff');
@@ -60,10 +61,10 @@ const filtered=(emps)=>{
   const query=norm($('#weekSearch').value.trim()),team=$('#weekTeam').value,job=$('#weekRole').value;
   return emps.filter(e=>(!team||e.equipe===team)&&(!job||e.role===job)&&(!query||[e.name,e.role].some(v=>norm(v).includes(query))));
 };
-const teamColors=['#2457a7','#147d72','#9256a0','#9a651d','#be4960'];
+const teamColors=['#146e67','#7b5b91','#a46638','#426e8c','#945668'];
 function colorFor(e,ds){
   const shift=S.shift[`${e.id}|${ds}`],configured=S.settings.turnos.find(x=>x.nome===shift?.nome)?.cor;
-  if(configured&&/^#[0-9a-f]{6}$/i.test(configured))return configured;
+  if(configured&&/^#[0-9a-f]{6}$/i.test(configured))return configured.toLowerCase()==='#2457a7'?defaults.cor_primaria:configured;
   let hash=0;for(const ch of String(e.equipe||e.role))hash=(hash*31+ch.charCodeAt(0))>>>0;
   return teamColors[hash%teamColors.length];
 }
@@ -87,7 +88,7 @@ function render(){
   if(!S.emps.length){
     $('#ttl').textContent=MN[m]+' '+y;
     $('#view').innerHTML='<div class="empty-state"><strong>Equipe ainda não cadastrada</strong><p>Abra Funcionários para adicionar a primeira pessoa à escala.</p></div>';
-    $('#overview').innerHTML='';$('#alerts').innerHTML='';$('#weekResults').textContent='0 funcionários';return;
+    $('#alerts').innerHTML='';$('#weekResults').textContent='0 funcionários';return;
   }
   if(mode==='m'){
     $('#ttl').textContent=MN[m]+' '+y;
@@ -145,9 +146,6 @@ function render(){
     else if(issues.warnings.length)A.push('<b>'+esc(e.name)+'</b> em '+fd(d)+': ⚠ '+esc(issues.warnings.map(r=>r.short).join(' · '))+'.');
   }});
   $('#alerts').innerHTML=A.length?'<div class="d"><strong>Escalas para revisar</strong> · '+A.slice(0,5).join(' · ')+(A.length>5?' · +'+(A.length-5)+' outra(s)':'')+'</div>':'';
-  const active=S.emps.filter(e=>e.ativo),workingToday=active.filter(e=>W(e.id,t)).length,offToday=active.filter(e=>st(e.id,t)==='F').length;
-  let gaps=0;for(let d=new Date(y,m,1);d.getMonth()===m;d=add(d,1))if(coverageGap(d,S.emps,W,S.settings).missing)gaps++;
-  $('#overview').innerHTML=[['●','Trabalhando em '+fd(t),workingToday],['✓','De folga em '+fd(t),offToday],['⚠','Alertas no período',A.length],['⛔','Dias sem cobertura no mês',gaps]].map(([icon,label,value])=>'<div class="metric"><span>'+icon+' '+label+'</span><strong>'+value+'</strong></div>').join('');
 }
 
 function bounds(){

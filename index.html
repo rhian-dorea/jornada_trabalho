@@ -17,7 +17,6 @@
 </nav>
 <main id="main" hidden>
   <div class="page-section" id="schedulePage">
-    <section class="overview" id="overview" aria-label="Resumo da escala"></section>
     <section class="alerts" id="alerts" aria-live="polite"></section>
     <section class="panel schedule-panel">
     <div class="bar">
@@ -26,7 +25,7 @@
     </div>
     <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="export-actions"><button id="bCsv">Exportar CSV</button><button id="bPrint">Imprimir / PDF</button></div></div>
     <div class="week-tools" id="weekTools"><div><label for="weekSearch">Buscar nome ou cargo</label><input id="weekSearch" type="search" placeholder="Nome ou cargo" autocomplete="off"></div><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><div><label for="weekRole">Cargo</label><select id="weekRole"><option value="">Todos os cargos</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
-    <div class="lg" aria-label="Legenda"><span>● Trabalho</span><span>✓ Folga</span><span>⛔ Descanso obrigatório</span><span>⚠ Aviso</span><span>— Sem lançamento</span></div>
+    <div class="lg" aria-label="Legenda"><span class="lg-work">● Trabalho</span><span class="lg-off">✓ Folga</span><span class="lg-blocked">⛔ Descanso obrigatório</span><span class="lg-warning">⚠ Aviso</span><span>— Sem lançamento</span></div>
     <div id="view"></div>
     </section>
   </div>

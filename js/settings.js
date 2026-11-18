@@ -1,7 +1,7 @@
 export const defaults = Object.freeze({
-  nome: 'Controle de Escalas', logo_url: '', cor_primaria: '#2457a7', tema: 'light',
+  nome: 'Controle de Escalas', logo_url: '', cor_primaria: '#146e67', tema: 'light',
   regras: { dias: 6, domingos: 1, dias_lideranca: 7, domingos_lideranca: 2, interjornada: 11 },
-  turnos: [{ nome: 'Comercial', inicio: '08:00', fim: '17:00', cor: '#2457a7' }],
+  turnos: [{ nome: 'Comercial', inicio: '08:00', fim: '17:00', cor: '#146e67' }],
   cobertura: { geral: [1,1,1,1,1,1,1], equipes: {} }, feriados: []
 });
 
