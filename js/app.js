@@ -1,5 +1,6 @@
-import { db, configured, profile, employees, journeys, saveEmployee, saveJourney } from './data.js';
+import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
+import { defaults, normalizeSettings, coverageGap } from './settings.js';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -10,16 +11,25 @@ const today = () => { const d=new Date(); return new Date(d.getFullYear(),d.getM
 const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1);
-let S={emps:[],rec:{},versions:{},empVersions:{}};
+const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(-2);
+let S={emps:[],rec:{},versions:{},empVersions:{},shift:{},settings:normalizeSettings()};
 let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, modalReturnFocus=null;
 const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
 const W=(id,d)=>st(id,d)==='T';
-const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W);
-const warningsOn=(e,d)=>workWarnings(e,d,W);
-function pos(id,d){let b=0;while(W(id,add(d,-b-1)))b++;return b+1}
-const check=(e,d)=>validateWork(e,d,W);
+const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W,S.settings.regras);
+const warningsOn=(e,d)=>workWarnings(e,d,W,S.settings.regras);
+const check=(e,d)=>validateWork(e,d,W,S.settings.regras);
 function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)':'';t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5200)}
+function applyBrand(){
+  const s=S.settings;
+  document.documentElement.dataset.theme=s.tema;
+  const color=/^#[0-9a-f]{6}$/i.test(s.cor_primaria)?s.cor_primaria:defaults.cor_primaria;
+  document.documentElement.style.setProperty('--brand',color);
+  const rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);
+  document.documentElement.style.setProperty('--brand-text',rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>.179?'#111827':'#ffffff');
+  $('#brandName').textContent=s.nome||defaults.nome;
+  $('#brandLogo').src=s.logo_url&&/^https:\/\//i.test(s.logo_url)?s.logo_url:'./assets/mark.svg';
+}
 function showPage(nextPage){
   if(!user)return;
   page=nextPage;
@@ -34,78 +44,110 @@ function showPage(nextPage){
 function info(e,d){
   const c=st(e.id,d);
   if(c==='T'){
-    const assessment=assessWork(e,d,W);
-    if(assessment.restrictions.length)return{c:'bad',t:'Trabalho',detail:assessment.restrictions.map(r=>r.short).join(' · ')};
-    if(assessment.warnings.length)return{c:'exception',t:'Trabalho',detail:assessment.warnings.map(r=>r.short).join(' · ')};
-    return{c:'t',t:'Trabalho',detail:pos(e.id,d)+'º dia seguido'};
+    const assessment=assessWork(e,d,W,S.settings.regras);
+    if(assessment.restrictions.length)return{c:'bad',t:'⛔ Descanso obrigatório',detail:assessment.restrictions.map(r=>r.short).join(' · ')};
+    if(assessment.warnings.length)return{c:'exception',t:'⚠ Aviso',detail:assessment.warnings.map(r=>r.short).join(' · ')};
+    return{c:'t',t:'● Trabalho',detail:''};
   }
-  if(c==='F')return{c:'f',t:'Folga',detail:''};
+  if(c==='F')return{c:'f',t:'✓ Folga',detail:''};
   const blocked=restrictionsOn(e,d);
-  if(blocked.length)return{c:'blocked',t:'Descanso necessário',detail:blocked.map(r=>r.short).join(' · ')};
-  return{c:'z',t:'Sem lançamento',detail:''};
+  if(blocked.length)return{c:'blocked',t:'⛔ Descanso obrigatório',detail:blocked.map(r=>r.short).join(' · ')};
+  return{c:'z',t:'—',detail:''};
 }
 const visibleOn=d=>S.emps.filter(e=>e.ativo||st(e.id,d));
+const norm=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+const filtered=(emps)=>{
+  const query=norm($('#weekSearch').value.trim()),team=$('#weekTeam').value,job=$('#weekRole').value;
+  return emps.filter(e=>(!team||e.equipe===team)&&(!job||e.role===job)&&(!query||[e.name,e.role].some(v=>norm(v).includes(query))));
+};
+const teamColors=['#2457a7','#147d72','#9256a0','#9a651d','#be4960'];
+function colorFor(e,ds){
+  const shift=S.shift[`${e.id}|${ds}`],configured=S.settings.turnos.find(x=>x.nome===shift?.nome)?.cor;
+  if(configured&&/^#[0-9a-f]{6}$/i.test(configured))return configured;
+  let hash=0;for(const ch of String(e.equipe||e.role))hash=(hash*31+ch.charCodeAt(0))>>>0;
+  return teamColors[hash%teamColors.length];
+}
+const timeFor=(id,ds)=>{const shift=S.shift[`${id}|${ds}`];return shift?.inicio&&shift?.fim?shift.inicio+'–'+shift.fim+'h':''};
+const shortReason=reason=>reason.kind==='dias'?`⚠ ${reason.short.match(/\d+/)?.[0]} dias`:`⚠ ${reason.short.match(/\d+/)?.[0]} dom.`;
 function dayGroup(label,list,css,limit){
   if(!list.length)return '';
   const chips=list.slice(0,limit).map(item=>{
-    const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · ');
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" title="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(reason?'<em>'+esc(reason)+'</em>':'')+'</span>';
+    const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
+    const time=item.date?timeFor(e.id,item.date):'';
+    const parts=e.name.trim().split(/\s+/),compact=parts.length>1?parts[0]+' '+parts.at(-1)[0]+'.':parts[0];
+    const shownName=css==='work'?e.name:compact;
+    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--shift-color:'+colorFor(e,item.date||'')+'" title="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(time?' · '+time:'')+(reason?' · '+reason:''))+'">'+esc(shownName)+(time?'<em>'+esc(time)+'</em>':'')+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
   const remaining=list.length-limit;
-  const extra=remaining>0?'<span class="more-count">+'+remaining+' '+(remaining===1?'pessoa':'pessoas')+'</span>':'';
+  const extra=remaining>0?'<span class="more-count">+'+remaining+' no detalhe</span>':'';
   return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+extra+'</div></div>';
 }
 function render(){
   const t=today();let y=D.getFullYear(),m=D.getMonth(),from,to;
+  if(!S.emps.length){
+    $('#ttl').textContent=MN[m]+' '+y;
+    $('#view').innerHTML='<div class="empty-state"><strong>Equipe ainda não cadastrada</strong><p>Abra Funcionários para adicionar a primeira pessoa à escala.</p></div>';
+    $('#overview').innerHTML='';$('#alerts').innerHTML='';$('#weekResults').textContent='0 funcionários';return;
+  }
   if(mode==='m'){
     $('#ttl').textContent=MN[m]+' '+y;
     const f=new Date(y,m,1),nd=new Date(y,m+1,0).getDate(),wks=Math.ceil((f.getDay()+nd)/7);from=f;to=new Date(y,m,nd);
     let h='<div class="cal">'+WD.map(w=>'<div class="h">'+w+'</div>').join('');
     for(let i=0;i<wks*7;i++){
       const d=add(f,i-f.getDay());
-      const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
-      const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
+      const emps=filtered(visibleOn(d)),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
+      const workEntries=working.map(e=>({employee:e,date:key(d),warnings:warningsOn(e,d)}));
       const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
       const warnings=workEntries.filter(x=>x.warnings.length).length;
+      const cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
+      const holiday=S.settings.feriados.find(x=>x.data===key(d));
       h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
-        +(working.length||off.length||blocked.length?dayGroup('Trabalho',workEntries,'work',3)+dayGroup('Folga',off,'off',2)+dayGroup('Descanso necessário',blocked,'blocked',2):'<span class="day-empty">Sem lançamentos</span>')+'</div>';
+        +(cover.missing?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
+        +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
+        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work',workEntries.length)+dayGroup('✓ Folga',off,'off',1)+dayGroup('⛔ Descanso',blocked,'blocked',1):'<span class="day-empty">—</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
     const s0=add(D,-D.getDay()),s6=add(s0,6);from=s0;to=s6;
     $('#ttl').textContent=s0.getDate()+' '+MN[s0.getMonth()].slice(0,3)+' a '+s6.getDate()+' '+MN[s6.getMonth()].slice(0,3)+' '+s6.getFullYear();
-    const search=$('#weekSearch').value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
-    const team=$('#weekTeam').value;
-    const weekEmps=S.emps.filter(e=>(e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean))&&
-      (!team||e.equipe===team)&&(!search||[e.name,e.role].some(value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(search))));
-    $('#weekResults').textContent=weekEmps.length+' funcionário'+(weekEmps.length===1?'':'s');
+    const weekEmps=filtered(S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean)));
     let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><thead><tr><th class="nm" scope="col">Funcionário</th>';
     for(let i=0;i<7;i++){
       const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
-      const off=weekEmps.filter(e=>st(e.id,d)==='F').length;
-      const blocked=weekEmps.filter(e=>restrictionsOn(e,d).length>0).length;
-      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(off?'<span class="th-off">'+off+' folga'+(off===1?'':'s')+'</span>':'')+(blocked?'<span class="th-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+'</span>':'')+'</th>';
+      const cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
+      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+count+' trabalha'+(count===1?'':'m')+'</span>'+(cover.missing?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
     }
     h+='</tr></thead><tbody>';
     if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário corresponde aos filtros desta semana.</td></tr>';
     weekEmps.forEach(e=>{
       h+='<tr><th scope="row" class="nm employee-row-header"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></th>';
       for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
-        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail)+'</small>':'')+'</td>'}
+        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" style="--shift-color:'+colorFor(e,key(d))+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" title="'+esc(o.detail||o.t)+'" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(timeFor(e.id,key(d))?'<small class="cell-time">'+esc(timeFor(e.id,key(d)))+'</small>':'')+(o.detail?'<small class="cell-detail">'+esc(o.detail.split(' · ').map(x=>x.includes('domingo')?'⚠ '+(x.match(/\d+/)?.[0]||'2')+' dom.':'⚠ '+(x.match(/\d+/)?.[0]||'7')+' dias').join(' '))+'</small>':'')+'</td>'}
       h+='</tr>';
     });
-    $('#view').innerHTML=h+'</tbody></table></div>';
+    h+='</tbody></table></div><div class="week-mobile">';
+    for(let i=0;i<7;i++){const d=add(s0,i),cover=coverageGap(d,S.emps,W,S.settings,$('#weekTeam').value);
+      h+='<section class="mobile-day"><h3>'+WD[i]+' · '+fd(d)+(cover.missing?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
+        (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(timeFor(e.id,key(d))?'<small>'+esc(timeFor(e.id,key(d)))+'</small>':'')+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
+    }
+    $('#view').innerHTML=h+'</div>';
   }
-  $('#weekTools').hidden=mode!=='w';
+  const resultCount=filtered(S.emps.filter(e=>e.ativo||mode==='w'&&Array.from({length:7},(_,i)=>st(e.id,add(D,-D.getDay()+i))).some(Boolean))).length;
+  $('#weekResults').textContent=resultCount+' funcionário'+(resultCount===1?'':'s')+' nos filtros';
   $('#tM').className=mode==='m'?'on':'';$('#tW').className=mode==='w'?'on':'';
+  $('#tM').setAttribute('aria-pressed',String(mode==='m'));$('#tW').setAttribute('aria-pressed',String(mode==='w'));
   /* Somente irregularidades reais permanecem visíveis; a validação continua no banco. */
   const A=[];
   S.emps.forEach(e=>{for(let d=from;+d<=+to;d=add(d,1)){
     if(!W(e.id,d))continue;
-    const issues=workRestrictions(e,d,W);
-    if(issues.length)A.push('<b>'+esc(e.name)+'</b> em '+fd(d)+': '+esc(issues.map(r=>r.short).join(' · '))+'. Revise a escala.');
+    const issues=assessWork(e,d,W,S.settings.regras);
+    if(issues.restrictions.length)A.push('<b>'+esc(e.name)+'</b> em '+fd(d)+': ⛔ '+esc(issues.restrictions.map(r=>r.short).join(' · '))+'. Revise a escala.');
+    else if(issues.warnings.length)A.push('<b>'+esc(e.name)+'</b> em '+fd(d)+': ⚠ '+esc(issues.warnings.map(r=>r.short).join(' · '))+'.');
   }});
   $('#alerts').innerHTML=A.length?'<div class="d"><strong>Escalas para revisar</strong> · '+A.slice(0,5).join(' · ')+(A.length>5?' · +'+(A.length-5)+' outra(s)':'')+'</div>':'';
+  const active=S.emps.filter(e=>e.ativo),workingToday=active.filter(e=>W(e.id,t)).length,offToday=active.filter(e=>st(e.id,t)==='F').length;
+  let gaps=0;for(let d=new Date(y,m,1);d.getMonth()===m;d=add(d,1))if(coverageGap(d,S.emps,W,S.settings).missing)gaps++;
+  $('#overview').innerHTML=[['●','Trabalhando em '+fd(t),workingToday],['✓','De folga em '+fd(t),offToday],['⚠','Alertas no período',A.length],['⛔','Dias sem cobertura no mês',gaps]].map(([icon,label,value])=>'<div class="metric"><span>'+icon+' '+label+'</span><strong>'+value+'</strong></div>').join('');
 }
 
 function bounds(){
@@ -113,7 +155,12 @@ function bounds(){
   if(mode==='m'){
     const f=new Date(D.getFullYear(),D.getMonth(),1), e=new Date(D.getFullYear(),D.getMonth()+1,0);
     first=add(f,-f.getDay());last=add(e,6-e.getDay());
-  }else{first=add(D,-D.getDay());last=add(first,6)}
+  }else{
+    const weekStart=add(D,-D.getDay()),weekEnd=add(weekStart,6);
+    const monthStart=new Date(D.getFullYear(),D.getMonth(),1),monthEnd=new Date(D.getFullYear(),D.getMonth()+1,0);
+    first=weekStart<monthStart?weekStart:monthStart;
+    last=weekEnd>monthEnd?weekEnd:monthEnd;
+  }
   return [key(add(first,-14)),key(add(last,14))];
 }
 function setSync(message,error=false){$('#sync').textContent=message;$('#sync').classList.toggle('error',error)}
@@ -127,26 +174,37 @@ function explain(error){
 async function refresh(){
   if(!user)return;
   const seq=++loadSeq,[start,end]=bounds();setSync('Carregando…');
+  if(!S.emps.length)$('#view').innerHTML='<div class="loading-state" aria-label="Carregando escala"><span></span><span></span><span></span></div>';
   try{
-    const [emps,records,p]=await Promise.all([employees(),journeys(start,end),profile(user.id)]);
+    const todayKey=key(today());
+    const [emps,periodRecords,p,settings,todayRecords]=await Promise.all([employees(),journeys(start,end),profile(user.id),companySettings().catch(error=>{
+      if(['42P01','PGRST116','PGRST205'].includes(error.code))return null;
+      throw error;
+    }),todayKey>=start&&todayKey<=end?Promise.resolve([]):journeys(todayKey,todayKey)]);
+    const records=periodRecords.concat(todayRecords);
     if(seq!==loadSeq)return;
     if(!p?.ativo){user=null;role=null;S={emps:[],rec:{},versions:{},empVersions:{}};$('#ovDay').style.display='none';$('#main').hidden=true;$('#mainNav').hidden=true;$('#ovLogin').style.display='flex';$('#loginError').textContent='Conta sem perfil ativo.';setSync('Acesso indisponível',true);return}
-    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
-    const rec={},versions={};
+    role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil==='visualizacao'||p.perfil==='funcionario'?'funcionário':p.perfil}`;
+    const rec={},versions={},shift={};
     for(const r of records){
       (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
       versions[`${r.funcionario_id}|${r.data}`]=r.atualizado_em;
+      if(r.turno_nome)shift[`${r.funcionario_id}|${r.data}`]={nome:r.turno_nome,inicio:r.inicio?.slice(0,5),fim:r.fim?.slice(0,5)};
     }
-    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,
+    S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,shift,settings:normalizeSettings(settings||{}),
       empVersions:Object.fromEntries(emps.map(e=>[e.id,e.atualizado_em]))};
     const selectedTeam=$('#weekTeam').value;
     const teams=[...new Set(S.emps.map(e=>e.equipe).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     $('#weekTeam').replaceChildren(new Option('Todas as equipes',''),...teams.map(name=>new Option(name,name)));
     $('#weekTeam').value=teams.includes(selectedTeam)?selectedTeam:'';
+    const selectedRole=$('#weekRole').value,roles=[...new Set(S.emps.map(e=>e.role).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    $('#weekRole').replaceChildren(new Option('Todos os cargos',''),...roles.map(name=>new Option(name,name)));
+    $('#weekRole').value=roles.includes(selectedRole)?selectedRole:'';
+    applyBrand();
     render();if(page==='employees')cfg();
     if($('#ovDay').style.display==='flex')openDay($('#dB').dataset.d);
     setSync('Sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
-  }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error))}}
+  }catch(error){if(seq===loadSeq){setSync('Falha de conexão',true);toast(explain(error));if(!S.emps.length)$('#view').innerHTML='<div class="empty-state" role="alert"><strong>Não foi possível carregar a escala</strong><p>'+esc(explain(error))+'</p><button id="retryLoad">Tentar novamente</button></div>'}}
 }
 async function mutate(action,onError){
   if(busy)return;
@@ -156,7 +214,7 @@ async function mutate(action,onError){
   finally{busy=false}
 }
 async function setSt(id,ds,v){
-  if(role==='visualizacao')return;
+  if(role!=='gestor'&&role!=='administrador')return;
   const e=S.emps.find(x=>x.id===id);if(!e)return;
   const date=fromKey(ds);
   if(v==='F'&&(restrictionsOn(e,date).length||st(id,date)==='T'&&warningsOn(e,date).length)){
@@ -166,7 +224,9 @@ async function setSt(id,ds,v){
     const message=check(e,date);if(message){toast(message);return}
   }
   if(!v && st(id,fromKey(ds)) && !confirm(`Remover o lançamento de ${e.name} em ${ds}?`))return;
+  const selected=$('#dB [data-shift="'+id+'"]')?.value;
   await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
+    ...(v==='T'&&selected?{p_turno:selected}:{}),
     p_versao:S.versions[`${id}|${ds}`]??null}));
 }
 function renderDayRows(ds){
@@ -183,12 +243,14 @@ function renderDayRows(ds){
     return rank(a)-rank(b)||a.name.localeCompare(b.name,'pt-BR');
   });
   $('#dB').innerHTML=emps.length?emps.map(e=>{
-    const c=st(e.id,d),o=info(e,d),reasons=restrictionsOn(e,d),warnings=c==='T'?warningsOn(e,d):[],bl=reasons[0]?.message||'',can=role!=='visualizacao'&&(e.ativo||c&&role==='administrador');
+    const c=st(e.id,d),o=info(e,d),reasons=restrictionsOn(e,d),warnings=c==='T'?warningsOn(e,d):[],bl=reasons[0]?.message||'',can=(role==='gestor'||role==='administrador')&&(e.ativo||c&&role==='administrador');
     const noOff=reasons.length>0||warnings.length>0;
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
-    const restriction=reasons.length?'<small class="rule-note">Descanso necessário: '+esc(reasons.map(r=>r.short).join(' · '))+'</small>':'';
-    const warning=warnings.length?'<small class="rule-warning">Aviso: '+esc(warnings.map(r=>r.short).join(' · '))+'</small>':'';
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+    const restriction=reasons.length?'<small class="rule-note">⛔ Descanso obrigatório: '+esc(reasons.map(r=>r.message).join(' · '))+'</small>':'';
+    const warning=warnings.length?'<small class="rule-warning">⚠ Aviso: '+esc(warnings.map(r=>r.message).join(' · '))+'</small>':'';
+    const currentShift=S.shift[`${e.id}|${ds}`];
+    const shiftSelect='<label class="shift-control">Turno <select data-shift="'+e.id+'"'+(!can?' disabled':'')+'><option value="">Sem horário</option>'+S.settings.turnos.map(x=>'<option value="'+esc(x.nome)+'"'+(currentShift?.nome===x.nome?' selected':'')+'>'+esc(x.nome)+' · '+x.inicio+'–'+x.fim+'</option>').join('')+'</select></label>';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b">'+shiftSelect+'<button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
   }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
 }
 function openDay(ds,selectedId){
@@ -197,7 +259,7 @@ function openDay(ds,selectedId){
   if(opening)modalReturnFocus=document.activeElement;
   if(newDay){$('#dSearch').value='';$('#dFilter').value='all'}
   const d=fromKey(ds),emps=visibleOn(d);
-  $('#dT').textContent=WD[d.getDay()]+', '+d.toLocaleDateString('pt-BR');
+  $('#dT').textContent=WD[d.getDay()]+', '+fd(d);
   const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length,blocked=emps.filter(e=>restrictionsOn(e,d).length).length;
   const warnings=emps.filter(e=>st(e.id,d)==='T'&&warningsOn(e,d).length).length;
   $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off-blocked)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+' necessário'+(blocked===1?'':'s')+'</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
@@ -239,8 +301,20 @@ function selectRole(value){
   updateOtherRoleVisibility();
 }
 function resetForm(){editId=null;for(const id of ['fN','fM','fE','fROther'])$('#'+id).value='';$('#fR').value='';$('#fS').value='M';$('#fA').value='true';$('#bAdd').textContent='Adicionar';$('#fT').textContent='Adicionar funcionário';$('#bCan').hidden=true;updateOtherRoleVisibility()}
+$('#bCsv').onclick=()=>{
+  const [start,end]=bounds(),rows=[['Data','Funcionário','Cargo','Equipe','Situação','Turno','Início','Fim']];
+  for(const e of filtered(S.emps))for(let d=fromKey(start);+d<=+fromKey(end);d=add(d,1)){
+    const code=st(e.id,d);if(!code)continue;const shift=S.shift[`${e.id}|${key(d)}`]||{};
+    rows.push([d.toLocaleDateString('pt-BR'),e.name,e.role,e.equipe||'',code==='T'?'Trabalho':'Folga',shift.nome||'',shift.inicio||'',shift.fim||'']);
+  }
+  const safe=v=>{const s=String(v??'');return '"'+(/^[=+@\-]/.test(s)?"'":'')+s.replaceAll('"','""')+'"'};
+  const blob=new Blob(['\ufeff'+rows.map(row=>row.map(safe).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`escala-${key(D)}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+$('#bPrint').onclick=()=>window.print();
 
 $('#view').addEventListener('click',ev=>{
+  if(ev.target.id==='retryLoad'){refresh();return}
   const c=ev.target.closest('[data-e]'),dy=ev.target.closest('[data-day]');
   if(c)openDay(c.dataset.d,c.dataset.e);
   else if(dy)openDay(dy.dataset.day);
@@ -250,11 +324,19 @@ $('#dB').addEventListener('click',ev=>{const b=ev.target.closest('[data-s]');if(
 $('#dSearch').addEventListener('input',()=>renderDayRows($('#dB').dataset.d));
 $('#dFilter').addEventListener('change',()=>renderDayRows($('#dB').dataset.d));
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{$('#'+b.dataset.close).style.display='none';modalReturnFocus?.focus()});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('#ovDay').style.display==='flex'){$('#ovDay').style.display='none';modalReturnFocus?.focus()}});
+document.addEventListener('keydown',ev=>{
+  if($('#ovDay').style.display!=='flex')return;
+  if(ev.key==='Escape'){$('#ovDay').style.display='none';modalReturnFocus?.focus();return}
+  if(ev.key!=='Tab')return;
+  const items=[...$('#ovDay').querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled)')].filter(x=>x.offsetParent!==null);
+  if(!items.length)return;
+  if(ev.shiftKey&&document.activeElement===items[0]){ev.preventDefault();items.at(-1).focus()}
+  else if(!ev.shiftKey&&document.activeElement===items.at(-1)){ev.preventDefault();items[0].focus()}
+});
 $('#bSchedule').onclick=()=>showPage('schedule');$('#bEmployees').onclick=()=>showPage('employees');
 $('#bNewEmployee').onclick=()=>{resetForm();$('#employeeFormPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#fN').focus({preventScroll:true})};
 $('#empSearch').addEventListener('input',renderEmployees);$('#empStatus').addEventListener('change',renderEmployees);
-$('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);
+$('#weekSearch').addEventListener('input',render);$('#weekTeam').addEventListener('change',render);$('#weekRole').addEventListener('change',render);
 $('#tM').onclick=()=>{mode='m';refresh()};$('#tW').onclick=()=>{mode='w';refresh()};
 $('#pv').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()-1,1):add(D,-7);refresh()};
 $('#nx').onclick=()=>{D=mode==='m'?new Date(D.getFullYear(),D.getMonth()+1,1):add(D,7);refresh()};
@@ -287,7 +369,7 @@ async function showSession(){
     const p=await profile(current.id);
     if(!p||!p.ativo)throw new Error('Conta sem perfil ativo. Solicite acesso ao administrador.');
     if(user?.id!==current.id){S={emps:[],rec:{},versions:{},empVersions:{}};page='schedule'}
-    user=current;role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil}`;
+    user=current;role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil==='visualizacao'||p.perfil==='funcionario'?'funcionário':p.perfil}`;
     $('#main').hidden=false;$('#mainNav').hidden=false;$('#ovLogin').style.display='none';$('#loginError').textContent='';
     $('#bReload').hidden=false;$('#bOut').hidden=false;showPage(page);
     await refresh();

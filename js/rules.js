@@ -1,5 +1,5 @@
 const next = (date, days) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-const label = date => `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}`;
+const label = date => `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getFullYear()).slice(-2)}`;
 const normalizedTitle = value => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 
 export function canonicalRole(value) {
@@ -14,7 +14,7 @@ export function hasExtendedSchedule(employee) {
 }
 
 // Pré-validação visual. O PostgreSQL aplica a validação definitiva na transação.
-export function assessWork(employee, date, isWorking) {
+export function assessWork(employee, date, isWorking, rules = {}) {
   const restrictions = [];
   const warnings = [];
   const extended = hasExtendedSchedule(employee);
@@ -23,33 +23,33 @@ export function assessWork(employee, date, isWorking) {
   while (isWorking(employee.id, next(date, -before - 1))) before++;
   while (isWorking(employee.id, next(date, after + 1))) after++;
   const days = before + after + 1;
-  if (days > (extended ? 7 : 6))
-    restrictions.push({ kind: 'dias', short: extended ? '8º dia seguido' : '7º dia seguido',
+  const maxDays = Number(extended ? rules.dias_lideranca ?? 7 : rules.dias ?? 6);
+  const maxSundays = Number(extended ? rules.domingos_lideranca ?? 2 : rules.domingos ?? 1);
+  if (days > maxDays)
+    restrictions.push({ kind: 'dias', short: `${maxDays + 1}º dia seguido`,
       message: `Bloqueado: ${employee.name} teria ${days} dias seguidos de trabalho (inclui ${label(date)}).` });
-  else if (extended && days === 7 && (!current || before === 6))
-    warnings.push({ kind: 'dias', short: '7º dia seguido' });
+  else if (extended && days === maxDays && (!current || before === maxDays - 1))
+    warnings.push({ kind: 'dias', short: `${maxDays}º dia seguido`, message: `Aviso: ${employee.name} trabalha no ${maxDays}º dia consecutivo em ${label(date)}.` });
 
   if (date.getDay() === 0) {
-    const previous = isWorking(employee.id, next(date, -7));
-    const following = isWorking(employee.id, next(date, 7));
-    if (extended) {
-      const triple = previous && (isWorking(employee.id, next(date, -14)) || following) ||
-        following && isWorking(employee.id, next(date, 14));
-      if (triple) restrictions.push({ kind: 'domingo', short: '3 domingos seguidos',
-        message: `Bloqueado: ${employee.name} trabalharia 3 domingos seguidos.` });
-      else if ((previous || following) && (!current || previous))
-        warnings.push({ kind: 'domingo', short: '2 domingos seguidos' });
-    } else if (employee.sex === 'F' && (previous || following)) {
-      restrictions.push({ kind: 'domingo', short: '2 domingos seguidos',
-        message: `Bloqueado: ${employee.name} trabalharia 2 domingos seguidos.` });
+    if (extended || employee.sex === 'F') {
+      let beforeSunday = 0, afterSunday = 0;
+      while (isWorking(employee.id, next(date, -7 * (beforeSunday + 1)))) beforeSunday++;
+      while (isWorking(employee.id, next(date, 7 * (afterSunday + 1)))) afterSunday++;
+      const total = beforeSunday + afterSunday + 1;
+      if (total > maxSundays) restrictions.push({ kind: 'domingo', short: `${maxSundays + 1} domingos seguidos`,
+        message: `Bloqueado: ${employee.name} trabalharia ${total} domingos seguidos.` });
+      else if (extended && total === maxSundays && maxSundays > 1 && (!current || beforeSunday === maxSundays - 1))
+        warnings.push({ kind: 'domingo', short: `${maxSundays} domingos seguidos`,
+          message: `Aviso: ${employee.name} trabalha no ${maxSundays}º domingo consecutivo em ${label(date)}.` });
     }
   }
   return { restrictions, warnings };
 }
 
-export const workRestrictions = (employee, date, isWorking) => assessWork(employee, date, isWorking).restrictions;
-export const workWarnings = (employee, date, isWorking) => assessWork(employee, date, isWorking).warnings;
+export const workRestrictions = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).restrictions;
+export const workWarnings = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).warnings;
 
-export function validateWork(employee, date, isWorking) {
-  return workRestrictions(employee, date, isWorking)[0]?.message || '';
+export function validateWork(employee, date, isWorking, rules) {
+  return workRestrictions(employee, date, isWorking, rules)[0]?.message || '';
 }

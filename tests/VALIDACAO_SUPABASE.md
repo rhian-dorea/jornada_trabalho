@@ -33,6 +33,15 @@
 1. Teste o parser CSV local com arquivo válido, vazio, cabeçalho errado, linha incompleta, data impossível, linha repetida e campo malicioso `=...`. Em projeto de homologação, teste o limite de 5000 linhas da RPC.
 2. Via procedimento administrativo autenticado, chame `importar_csv` com uma linha que viola a regra: zero linhas devem ser persistidas. Repita importação válida: sem duplicação. Tente lançamento existente com situação diferente: rejeição.
 3. Depois de preservar um backup, chame `migrar_local` com JSON legado v2 e v1 em homologação. Verifique contagens, UUIDs e associação por ID. Repita: zero novos registros. Teste JSON com funcionário sem ID, data inválida, referência ausente e regra violada: rejeição total e origem intacta.
-4. Interrompa a rede durante uma chamada administrativa; confira no banco se houve commit antes de repetir. A interface atual não expõe importação, exportação ou migração.
+4. Interrompa a rede durante uma chamada administrativa; confira no banco se houve commit antes de repetir. A interface expõe exportação CSV, mas importação e migração exigem procedimento separado.
+
+## Configurações, turnos e cobertura
+
+1. Aplique `006_configuracoes_empresa.sql` em homologação e confira que IDs, jornadas e perfis anteriores foram preservados; todos recebem `empresa_id`.
+2. Em homologação, chame `salvar_configuracoes` como administrador para mudar nome, cor, tema e cobertura geral/equipe. Recarregue e confirme persistência. Gestor e visualização não devem conseguir chamar a função via API. A interface não oferece tela de Configurações.
+3. Crie dois turnos com cores diferentes e lance jornadas nos dois. Verifique cor, horário no detalhe e na semana, CSV e PDF. Troque Trabalho por Folga: o turno antigo deve ser removido.
+4. Configure interjornada maior que o intervalo entre dois turnos consecutivos e tente gravar o segundo: o banco deve rejeitar. Teste turno que cruza a meia-noite.
+5. Reduza os limites de dias/domigos para um valor incompatível com o histórico: a alteração das regras deve ser revertida integralmente. Teste as viradas de mês e ano.
+6. Na visão mensal e semanal, confirme o alerta quando a equipe estiver abaixo da cobertura configurada, inclusive zero pessoas. Confira filtros, `+N` no dia, tecla Enter, fechamento do modal por Escape e lista semanal no celular.
 
 Registre evidências do resultado real antes de declarar prontidão para produção.

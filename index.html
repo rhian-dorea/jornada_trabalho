@@ -9,7 +9,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><div class="logo"><img src="./assets/mark.svg" alt=""></div><div><h1>Controle de Escalas e DSR</h1><p>Descanso semanal remunerado · dados sincronizados</p></div></div>
+  <div class="brand"><div class="logo"><img id="brandLogo" src="./assets/mark.svg" alt=""></div><div><h1 id="brandName">Controle de Escalas e DSR</h1><p>Planejamento de equipes</p></div></div>
   <div class="head-actions"><span id="sync" role="status">Aguardando conexão</span><span id="user"></span><button id="bReload" hidden>Atualizar</button><button id="bOut" hidden>Sair</button></div>
 </header>
 <nav class="main-nav" id="mainNav" aria-label="Navegação principal" hidden>
@@ -17,14 +17,16 @@
 </nav>
 <main id="main" hidden>
   <div class="page-section" id="schedulePage">
+    <section class="overview" id="overview" aria-label="Resumo da escala"></section>
     <section class="alerts" id="alerts" aria-live="polite"></section>
     <section class="panel schedule-panel">
     <div class="bar">
       <div class="section-intro"><span class="eyebrow">Planejamento da equipe</span><h2>Calendário de trabalho</h2><p>Veja quem trabalha, quem está de folga e os descansos exigidos. Selecione um dia para ajustar a escala.</p></div>
       <div class="tabs" role="group" aria-label="Modo de visualização"><button id="tM" class="on">Mensal</button><button id="tW">Semanal</button></div>
     </div>
-    <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="lg"><span><i class="legend-work"></i>Trabalho</span><span><i class="legend-off"></i>Folga</span><span><i class="legend-blocked"></i>Descanso necessário / aviso</span></div></div>
-    <div class="week-tools" id="weekTools" hidden><div><label for="weekSearch">Buscar na semana</label><input id="weekSearch" type="search" placeholder="Nome ou cargo" autocomplete="off"></div><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
+    <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div><div class="export-actions"><button id="bCsv">Exportar CSV</button><button id="bPrint">Imprimir / PDF</button></div></div>
+    <div class="week-tools" id="weekTools"><div><label for="weekSearch">Buscar nome ou cargo</label><input id="weekSearch" type="search" placeholder="Nome ou cargo" autocomplete="off"></div><div><label for="weekTeam">Equipe</label><select id="weekTeam"><option value="">Todas as equipes</option></select></div><div><label for="weekRole">Cargo</label><select id="weekRole"><option value="">Todos os cargos</option></select></div><span id="weekResults" class="week-results" role="status"></span></div>
+    <div class="lg" aria-label="Legenda"><span>● Trabalho</span><span>✓ Folga</span><span>⛔ Descanso obrigatório</span><span>⚠ Aviso</span><span>— Sem lançamento</span></div>
     <div id="view"></div>
     </section>
   </div>
@@ -37,7 +39,7 @@
   </section>
 </main>
 
-<div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div class="day-tools"><div><label for="dSearch">Buscar funcionário</label><input id="dSearch" type="search" placeholder="Digite um nome" autocomplete="off"></div><div><label for="dFilter">Mostrar</label><select id="dFilter"><option value="all">Todos</option><option value="work">Trabalho</option><option value="off">Folga</option><option value="blocked">Descanso necessário</option><option value="exception">Avisos de exceção</option><option value="empty">Sem lançamento</option></select></div></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
+<div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div class="day-tools"><div><label for="dSearch">Buscar funcionário</label><input id="dSearch" type="search" placeholder="Digite um nome" autocomplete="off"></div><div><label for="dFilter">Mostrar</label><select id="dFilter"><option value="all">Todos</option><option value="work">Trabalho</option><option value="off">Folga</option><option value="blocked">Descanso obrigatório</option><option value="exception">Avisos</option><option value="empty">Sem lançamento</option></select></div></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
 <div class="ov" id="ovLogin" style="display:flex"><form class="box" id="loginForm"><h2>Acessar Controle de Escalas</h2><p>Entre com sua conta autorizada.</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><div style="display:flex;gap:8px;margin-top:14px"><button class="p" type="submit" id="bLogin">Entrar</button><button type="button" id="bReset">Recuperar senha</button></div><p id="loginError" role="alert"></p></form></div>
