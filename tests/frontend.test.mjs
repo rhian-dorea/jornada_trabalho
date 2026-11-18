@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validateWork, workWarnings, hasExtendedSchedule, canonicalRole } from '../js/rules.js';
 import { parseCSV, exportCSV } from '../js/csv.js';
 import { readLegacy } from '../js/migration.js';
+import { normalizeSettings, coverageGap } from '../js/settings.js';
 
 const date = s => new Date(`${s}T12:00:00`);
 const work = values => (_id, d) => values.has(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
@@ -72,4 +73,18 @@ test('migração preserva associação por ID e rejeita datas inválidas', () =>
   assert.equal(result.emps[0].id,'old1');assert.equal(result.journeys[0].legado_id,'old1');
   assert.equal(result.errors.length,1);
   delete globalThis.localStorage;
+});
+test('limites configuráveis alteram a pré-validação sem mudar os padrões', () => {
+  const days = new Set(['2026-11-01','2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06']);
+  assert.match(validateWork({...emp,sex:'M'},date('2026-11-07'),work(days)),/7 dias/);
+  assert.equal(validateWork({...emp,sex:'M'},date('2026-11-07'),work(days),{dias:7}), '');
+  assert.match(validateWork({...emp,role:'Supervisor'},date('2026-11-07'),work(days),{dias_lideranca:6}),/7 dias/);
+  assert.equal(validateWork(emp,date('2026-11-08'),work(new Set(['2026-11-01'])),{domingos:2}), '');
+});
+test('cobertura soma equipes sem contar duas vezes a falta geral', () => {
+  const settings=normalizeSettings({cobertura:{geral:[1,1,1,1,1,1,1],equipes:{A:[2,0,0,0,0,0,0],B:[1,0,0,0,0,0,0]}}});
+  const staff=[{id:'a',equipe:'A',ativo:true},{id:'b',equipe:'B',ativo:true}];
+  const result=coverageGap(date('2026-11-01'),staff,(id)=>id==='a',settings);
+  assert.equal(result.count,1);assert.equal(result.missing,2);
+  assert.equal(coverageGap(date('2026-11-01'),staff,(id)=>id==='a',settings,'B').missing,1);
 });
