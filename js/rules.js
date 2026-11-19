@@ -14,14 +14,15 @@ export function hasExtendedSchedule(employee) {
 }
 
 // Pré-validação visual. O PostgreSQL aplica a validação definitiva na transação.
-export function assessWork(employee, date, isWorking, rules = {}) {
+export function assessWork(employee, date, isWorking, rules = {}, includeFuture = false) {
   const restrictions = [];
   const warnings = [];
   const extended = hasExtendedSchedule(employee);
   const current = isWorking(employee.id, date);
   let before = 0, after = 0;
   while (isWorking(employee.id, next(date, -before - 1))) before++;
-  while (isWorking(employee.id, next(date, after + 1))) after++;
+  // O calendário mostra o ciclo até a data; só a validação de edição une os dois lados.
+  if (includeFuture) while (isWorking(employee.id, next(date, after + 1))) after++;
   const days = before + after + 1;
   const maxDays = Number(extended ? rules.dias_lideranca ?? 7 : rules.dias ?? 6);
   const maxSundays = Number(extended ? rules.domingos_lideranca ?? 2 : rules.domingos ?? 1);
@@ -35,7 +36,7 @@ export function assessWork(employee, date, isWorking, rules = {}) {
     if (extended || employee.sex === 'F') {
       let beforeSunday = 0, afterSunday = 0;
       while (isWorking(employee.id, next(date, -7 * (beforeSunday + 1)))) beforeSunday++;
-      while (isWorking(employee.id, next(date, 7 * (afterSunday + 1)))) afterSunday++;
+      if (includeFuture) while (isWorking(employee.id, next(date, 7 * (afterSunday + 1)))) afterSunday++;
       const total = beforeSunday + afterSunday + 1;
       if (total > maxSundays) restrictions.push({ kind: 'domingo', short: `${maxSundays + 1} domingos seguidos`,
         message: `Bloqueado: ${employee.name} trabalharia ${total} domingos seguidos.` });
@@ -51,5 +52,5 @@ export const workRestrictions = (employee, date, isWorking, rules) => assessWork
 export const workWarnings = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).warnings;
 
 export function validateWork(employee, date, isWorking, rules) {
-  return workRestrictions(employee, date, isWorking, rules)[0]?.message || '';
+  return assessWork(employee, date, isWorking, rules, true).restrictions[0]?.message || '';
 }

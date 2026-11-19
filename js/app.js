@@ -1,7 +1,7 @@
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
 import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
-import { dayPeople, showCoverageAlert } from './calendar-state.js';
+import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js';
 import { summarizeEmployeeMonth } from './monthly-summary.js';
 
 const $ = s => document.querySelector(s);
@@ -94,10 +94,10 @@ function render(){
   }
   if(mode==='m'){
     $('#ttl').textContent=MN[m]+' '+y;
-    const f=new Date(y,m,1),nd=new Date(y,m+1,0).getDate(),wks=Math.ceil((f.getDay()+nd)/7);from=f;to=new Date(y,m,nd);
-    let h='<div class="cal">'+WD.map(w=>'<div class="h">'+w+'</div>').join('');
+    const f=new Date(y,m,1),nd=new Date(y,m+1,0).getDate(),wks=Math.ceil((mondayOffset(f)+nd)/7);from=f;to=new Date(y,m,nd);
+    let h='<div class="cal">'+[1,2,3,4,5,6,0].map(i=>'<div class="h">'+WD[i]+'</div>').join('');
     for(let i=0;i<wks*7;i++){
-      const d=add(f,i-f.getDay());
+      const d=add(f,i-mondayOffset(f));
       const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
       const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
       const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
@@ -111,14 +111,14 @@ function render(){
     }
     $('#view').innerHTML=h+'</div>';
   }else{
-    const s0=add(D,-D.getDay()),s6=add(s0,6);from=s0;to=s6;
+    const s0=add(D,-mondayOffset(D)),s6=add(s0,6);from=s0;to=s6;
     $('#ttl').textContent=s0.getDate()+' '+MN[s0.getMonth()].slice(0,3)+' a '+s6.getDate()+' '+MN[s6.getMonth()].slice(0,3)+' '+s6.getFullYear();
     const weekEmps=S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean));
     let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><thead><tr><th class="nm" scope="col">Funcionário</th>';
     for(let i=0;i<7;i++){
       const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
       const cover=coverageGap(d,S.emps,W,S.settings);
-      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(i===0?'sunday-col':'')+'">'+WD[i]+'<small>'+fd(d)+'</small><span class="th-count">'+(count?count+' trabalha'+(count===1?'':'m'):'—')+'</span>'+(showCoverageAlert(count,cover.missing)?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
+      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(d.getDay()===0?'sunday-col':'')+'">'+WD[d.getDay()]+'<small>'+fd(d)+'</small><span class="th-count">'+(count?count+' trabalha'+(count===1?'':'m'):'—')+'</span>'+(showCoverageAlert(count,cover.missing)?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
     }
     h+='</tr></thead><tbody>';
     if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário corresponde aos filtros desta semana.</td></tr>';
@@ -131,7 +131,7 @@ function render(){
     h+='</tbody></table></div><div class="week-mobile">';
     for(let i=0;i<7;i++){const d=add(s0,i),cover=coverageGap(d,S.emps,W,S.settings);
       const visibleWorking=weekEmps.filter(e=>W(e.id,d)).length;
-      h+='<section class="mobile-day"><h3>'+WD[i]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
+      h+='<section class="mobile-day"><h3>'+WD[d.getDay()]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
         (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
     }
     $('#view').innerHTML=h+'</div>';
@@ -153,9 +153,9 @@ function bounds(){
   let first,last;
   if(mode==='m'){
     const f=new Date(D.getFullYear(),D.getMonth(),1), e=new Date(D.getFullYear(),D.getMonth()+1,0);
-    first=add(f,-f.getDay());last=add(e,6-e.getDay());
+    first=add(f,-mondayOffset(f));last=add(e,6-mondayOffset(e));
   }else{
-    const weekStart=add(D,-D.getDay()),weekEnd=add(weekStart,6);
+    const weekStart=add(D,-mondayOffset(D)),weekEnd=add(weekStart,6);
     const monthStart=new Date(D.getFullYear(),D.getMonth(),1),monthEnd=new Date(D.getFullYear(),D.getMonth()+1,0);
     first=weekStart<monthStart?weekStart:monthStart;
     last=weekEnd>monthEnd?weekEnd:monthEnd;

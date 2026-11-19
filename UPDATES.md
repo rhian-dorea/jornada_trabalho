@@ -1,5 +1,17 @@
 # Atualizações
 
+## 2026-11-19 — ordem dos dias
+
+- Calendários mensal e semanal começam na segunda-feira e terminam no domingo, inclusive no celular.
+- Alinhamento das datas e intervalo consultado acompanham a nova ordem; o destaque do domingo permanece no último dia.
+
+## 2026-11-19 — reinício dos ciclos de descanso
+
+- Avisos no calendário e no resumo contam somente a sequência anterior à data, sem juntar jornadas futuras através de um descanso.
+- Um dia sem trabalho interrompe os dias consecutivos; um domingo sem trabalho interrompe os domingos consecutivos.
+- A validação ao salvar continua verificando os dois lados da data, alinhada ao SQL, para impedir que edições retroativas unam sequências inválidas. Não há alteração de dados ou migração SQL.
+- Testes cobrem a escala da Lara, reinício dos ciclos, limites de liderança e viradas de mês/ano.
+
 ## 2026-11-17 — calendário e configurações
 
 - A visão mensal usa células compactas, indicadores de cobertura e acesso ao detalhe; a semanal usa estados curtos e lista por dia no celular.

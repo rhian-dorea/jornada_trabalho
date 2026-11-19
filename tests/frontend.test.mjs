@@ -1,15 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateWork, workWarnings, hasExtendedSchedule, canonicalRole } from '../js/rules.js';
+import { validateWork, workRestrictions, workWarnings, hasExtendedSchedule, canonicalRole } from '../js/rules.js';
 import { parseCSV, exportCSV } from '../js/csv.js';
 import { readLegacy } from '../js/migration.js';
 import { normalizeSettings, coverageGap } from '../js/settings.js';
-import { dayPeople, showCoverageAlert } from '../js/calendar-state.js';
+import { dayPeople, showCoverageAlert, mondayOffset } from '../js/calendar-state.js';
 import { summarizeEmployeeMonth } from '../js/monthly-summary.js';
 
 const date = s => new Date(`${s}T12:00:00`);
 const work = values => (_id, d) => values.has(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
 const emp = { id: 'e1', name: 'Ana', sex: 'F' };
+
+test('semana começa na segunda e domingo encerra a mesma semana', () => {
+  assert.equal(mondayOffset(date('2026-11-16')),0);
+  assert.equal(mondayOffset(date('2026-11-22')),6);
+  const sunday=date('2026-11-01');
+  sunday.setDate(sunday.getDate()-mondayOffset(sunday));
+  assert.equal(sunday.getMonth(),9);
+  assert.equal(sunday.getDate(),26);
+});
+
+test('descanso no domingo reinicia o ciclo sem unir dias futuros (caso Lara)', () => {
+  const days=new Set([8,10,11,12,13,16,17,18,19,21,22,23,24,25,26,28,30].map(n=>`2026-11-${String(n).padStart(2,'0')}`));
+  const working=work(days);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['domingo']);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-20'),working),[]);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working).map(r=>r.kind),['dias']);
+  assert.equal(workRestrictions(emp,date('2026-11-27'),working)[0].message.includes('7 dias'),true);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-28'),working),[]);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-29'),working).map(r=>r.kind),['domingo']);
+  // Preencher o descanso uniria os blocos: continua proibido na gravação.
+  assert.match(validateWork(emp,date('2026-11-20'),working),/11 dias/);
+});
+
+test('domingo sem trabalho reinicia domingos; dias de descanso reiniciam dias corridos', () => {
+  const days=new Set(['2026-11-01','2026-11-09','2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-16']);
+  const working=work(days);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-08'),working).map(r=>r.kind),['domingo']);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['dias']);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-16'),working),[]);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-22'),working),[]);
+});
 
 test('cinco e seis dias são permitidos; sétimo é bloqueado', () => {
   const five = new Set(['2026-11-01','2026-11-02','2026-11-03','2026-11-04','2026-11-05']);
