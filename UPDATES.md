@@ -1,5 +1,10 @@
 # Atualizações
 
+## 2026-11-19 — destaque dos fins de semana
+
+- Sábado e domingo recebem fundo azul claro no mês e nos cabeçalhos semanais, inclusive no celular. Células semanais vazias acompanham o destaque; as situações registradas mantêm suas cores.
+- O tema escuro usa uma tonalidade equivalente com contraste adequado.
+
 ## 2026-11-19 — atualização dos arquivos no navegador
 
 - HTML referencia versões do CSS, aplicativo, regras e estado do calendário para evitar reutilizar arquivos antigos após o deploy.

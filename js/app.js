@@ -104,7 +104,7 @@ function render(){
       const warnings=workEntries.filter(x=>x.warnings.length).length;
       const cover=coverageGap(d,S.emps,W,S.settings);
       const holiday=S.settings.feriados.find(x=>x.data===key(d));
-      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
+      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+([0,6].includes(d.getDay())?'weekend ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
         +(showCoverageAlert(working.length,cover.missing)?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
         +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
         +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off,'off')+dayGroup('⛔ Descanso',blocked,'blocked'):'<span class="day-empty">—</span>')+'</div>';
@@ -131,7 +131,7 @@ function render(){
     h+='</tbody></table></div><div class="week-mobile">';
     for(let i=0;i<7;i++){const d=add(s0,i),cover=coverageGap(d,S.emps,W,S.settings);
       const visibleWorking=weekEmps.filter(e=>W(e.id,d)).length;
-      h+='<section class="mobile-day"><h3>'+WD[d.getDay()]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
+      h+='<section class="mobile-day'+([0,6].includes(d.getDay())?' weekend':'')+'"><h3>'+WD[d.getDay()]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
         (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
     }
     $('#view').innerHTML=h+'</div>';
