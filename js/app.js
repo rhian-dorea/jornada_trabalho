@@ -1,7 +1,7 @@
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
-import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261119-2';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
-import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js';
+import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js?v=20261119-2';
 import { summarizeEmployeeMonth } from './monthly-summary.js';
 
 const $ = s => document.querySelector(s);

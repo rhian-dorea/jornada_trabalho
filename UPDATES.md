@@ -1,5 +1,10 @@
 # Atualizações
 
+## 2026-11-19 — atualização dos arquivos no navegador
+
+- HTML referencia versões do CSS, aplicativo, regras e estado do calendário para evitar reutilizar arquivos antigos após o deploy.
+- Conferido no GitHub Pages: o código publicado já começa na segunda-feira; os arquivos são servidos com cache de até 600 segundos.
+
 ## 2026-11-19 — ordem dos dias
 
 - Calendários mensal e semanal começam na segunda-feira e terminam no domingo, inclusive no celular.
