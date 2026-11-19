@@ -21,7 +21,7 @@ export function assessWork(employee, date, isWorking, rules = {}, includeFuture 
   const current = isWorking(employee.id, date);
   let before = 0, after = 0;
   while (isWorking(employee.id, next(date, -before - 1))) before++;
-  // O calendário mostra o ciclo até a data; só a validação de edição une os dois lados.
+  // Avaliar um lançamento considera os dois lados; jornadas existentes usam o ciclo até a data.
   if (includeFuture) while (isWorking(employee.id, next(date, after + 1))) after++;
   const days = before + after + 1;
   const maxDays = Number(extended ? rules.dias_lideranca ?? 7 : rules.dias ?? 6);
@@ -48,7 +48,12 @@ export function assessWork(employee, date, isWorking, rules = {}, includeFuture 
   return { restrictions, warnings };
 }
 
-export const workRestrictions = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).restrictions;
+export const workRestrictions = (employee, date, isWorking, rules) =>
+  assessWork(employee, date, isWorking, rules, true).restrictions.map(reason => ({
+    ...reason,
+    // Exibir o limite da regra, sem apresentar o dia de descanso como dia trabalhado.
+    message: `Descanso obrigatório em ${label(date)}: trabalhar nesta data atingiria ou ultrapassaria o limite de ${reason.short.replace('º dia seguido', ' dias seguidos')} para ${employee.name}.`
+  }));
 export const workWarnings = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).warnings;
 
 export function validateWork(employee, date, isWorking, rules) {

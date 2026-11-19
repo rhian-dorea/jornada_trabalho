@@ -20,11 +20,15 @@ test('semana começa na segunda e domingo encerra a mesma semana', () => {
   assert.equal(sunday.getDate(),26);
 });
 
-test('descanso no domingo reinicia o ciclo sem unir dias futuros (caso Lara)', () => {
+test('Lara em 20/11 mostra descanso de 7 dias ao impedir união dos blocos', () => {
   const days=new Set([8,10,11,12,13,16,17,18,19,21,22,23,24,25,26,28,30].map(n=>`2026-11-${String(n).padStart(2,'0')}`));
   const working=work(days);
   assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['domingo']);
-  assert.deepEqual(workRestrictions(emp,date('2026-11-20'),working),[]);
+  const rest=workRestrictions({...emp,name:'Lara'},date('2026-11-20'),working);
+  assert.deepEqual(rest.map(r=>r.kind),['dias']);
+  assert.equal(rest[0].short,'7º dia seguido');
+  assert.match(rest[0].message,/7 dias/);
+  assert.doesNotMatch(rest[0].message,/11 dias/);
   assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working).map(r=>r.kind),['dias']);
   assert.equal(workRestrictions(emp,date('2026-11-27'),working)[0].message.includes('7 dias'),true);
   assert.deepEqual(workRestrictions(emp,date('2026-11-28'),working),[]);
@@ -36,7 +40,7 @@ test('descanso no domingo reinicia o ciclo sem unir dias futuros (caso Lara)', (
 test('domingo sem trabalho reinicia domingos; dias de descanso reiniciam dias corridos', () => {
   const days=new Set(['2026-11-01','2026-11-09','2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-16']);
   const working=work(days);
-  assert.deepEqual(workRestrictions(emp,date('2026-11-08'),working).map(r=>r.kind),['domingo']);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-08'),working).map(r=>r.kind),['dias','domingo']);
   assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['dias']);
   assert.deepEqual(workRestrictions(emp,date('2026-11-16'),working),[]);
   assert.deepEqual(workRestrictions(emp,date('2026-11-22'),working),[]);

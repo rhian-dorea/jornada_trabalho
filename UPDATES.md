@@ -1,5 +1,10 @@
 # Atualizações
 
+## 2026-11-19 — descanso preventivo restaurado
+
+- Restaurado o descanso calculado em datas que uniriam blocos de trabalho antes e depois, incluindo Lara em 20/11/26.
+- O calendário e o detalhe exibem o limite da regra (7 dias / 2 domingos), sem informar que o descanso é um dia trabalhado. A validação de gravação continua verificando a sequência completa.
+
 ## 2026-11-19 — destaque dos fins de semana
 
 - Sábado e domingo recebem fundo azul claro no mês e nos cabeçalhos semanais, inclusive no celular. Células semanais vazias acompanham o destaque; as situações registradas mantêm suas cores.
