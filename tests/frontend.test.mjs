@@ -20,30 +20,61 @@ test('semana começa na segunda e domingo encerra a mesma semana', () => {
   assert.equal(sunday.getDate(),26);
 });
 
-test('Lara em 20/11 mostra descanso de 7 dias ao impedir união dos blocos', () => {
+test('calendário conta o ciclo real da Lara sem antecipar trabalhos futuros', () => {
   const days=new Set([8,10,11,12,13,16,17,18,19,21,22,23,24,25,26,28,30].map(n=>`2026-11-${String(n).padStart(2,'0')}`));
   const working=work(days);
   assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['domingo']);
   const rest=workRestrictions({...emp,name:'Lara'},date('2026-11-20'),working);
-  assert.deepEqual(rest.map(r=>r.kind),['dias']);
-  assert.equal(rest[0].short,'7º dia seguido');
-  assert.match(rest[0].message,/7 dias/);
-  assert.doesNotMatch(rest[0].message,/11 dias/);
+  assert.deepEqual(rest,[]);
   assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working).map(r=>r.kind),['dias']);
-  assert.equal(workRestrictions(emp,date('2026-11-27'),working)[0].message.includes('7 dias'),true);
+  assert.equal(workRestrictions(emp,date('2026-11-27'),working)[0].short,'7º dia seguido');
   assert.deepEqual(workRestrictions(emp,date('2026-11-28'),working),[]);
   assert.deepEqual(workRestrictions(emp,date('2026-11-29'),working).map(r=>r.kind),['domingo']);
   // Preencher o descanso uniria os blocos: continua proibido na gravação.
   assert.match(validateWork(emp,date('2026-11-20'),working),/11 dias/);
 });
 
+test('folga e remoção recalculam os avisos sem confundir previsão com ciclo real', () => {
+  const records=new Map([16,17,18,19,21,22,23,24,25,26].map(n=>[n,'T']));
+  const working=(_id,d)=>d.getFullYear()===2026&&d.getMonth()===10&&records.get(d.getDate())==='T';
+  for(const status of ['F','']){
+    records.set(24,status);
+    assert.match(validateWork(emp,date('2026-11-20'),working),/8 dias/);
+    assert.deepEqual(workRestrictions(emp,date('2026-11-20'),working),[]);
+  }
+  // Interromper em 22 deixa 16–21 (seis dias, incluindo a hipótese de trabalhar no dia 20).
+  for(const status of ['F','']){
+    records.set(22,status);
+    assert.equal(validateWork(emp,date('2026-11-20'),working),'');
+    assert.deepEqual(workRestrictions(emp,date('2026-11-20'),working),[]);
+  }
+});
+
 test('domingo sem trabalho reinicia domingos; dias de descanso reiniciam dias corridos', () => {
   const days=new Set(['2026-11-01','2026-11-09','2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-16']);
   const working=work(days);
-  assert.deepEqual(workRestrictions(emp,date('2026-11-08'),working).map(r=>r.kind),['dias','domingo']);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-08'),working).map(r=>r.kind),['domingo']);
   assert.deepEqual(workRestrictions(emp,date('2026-11-15'),working).map(r=>r.kind),['dias']);
   assert.deepEqual(workRestrictions(emp,date('2026-11-16'),working),[]);
   assert.deepEqual(workRestrictions(emp,date('2026-11-22'),working),[]);
+});
+
+test('escala da imagem: folga em 24 e 28 elimina aviso de dias no dia 29', () => {
+  const records=new Map([16,17,18,19,21,22,23,25,26,30].map(n=>[`2026-11-${n}`,'T']));
+  records.set('2026-11-24','F');records.set('2026-11-28','F');
+  for(let n=1;n<=5;n++)records.set(`2026-12-0${n}`,'T');
+  const working=(_id,d)=>records.get(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)==='T';
+  assert.deepEqual(workRestrictions(emp,date('2026-11-20'),working),[]);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working),[]);
+  assert.deepEqual(workRestrictions(emp,date('2026-11-29'),working).map(r=>r.kind),['domingo']);
+  records.set('2026-11-24','T');
+  assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working).map(r=>r.kind),['dias']);
+  for(const status of ['F','']){
+    records.set('2026-11-24',status);
+    assert.deepEqual(workRestrictions(emp,date('2026-11-27'),working),[]);
+  }
+  records.delete('2026-11-22');
+  assert.deepEqual(workRestrictions(emp,date('2026-11-29'),working),[]);
 });
 
 test('cinco e seis dias são permitidos; sétimo é bloqueado', () => {

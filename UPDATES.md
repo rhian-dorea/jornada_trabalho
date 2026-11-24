@@ -1,5 +1,16 @@
 # Atualizações
 
+## 2026-11-24 — separar ciclo exibido e validação de lançamento
+
+- Corrigida a interpretação anterior: o calendário e o resumo mostram o descanso pelo ciclo anterior à data, sem somar trabalhos futuros. Folga e ausência de trabalho interrompem os dias consecutivos.
+- Na escala enviada, 20/11 não mostra descanso por dias; 29/11, após a folga em 28, mantém apenas o motivo de domingos quando 22/11 tem trabalho.
+- A validação de um novo Trabalho permanece bidirecional para impedir que uma edição una blocos acima do limite. A mudança substitui a interpretação documentada em “verificação do recálculo da Lara”.
+
+## 2026-11-24 — verificação do recálculo da Lara
+
+- Reproduzida a escala com Trabalho em 16–19 e 21–23, e Folga em 24/11. Preencher o dia 20 ainda formaria oito dias de trabalho: o bloqueio permanece correto nesse cenário.
+- Adicionado teste para folga e remoção em 24/11 e para interrupção em 22/11; quando o bloco cai para seis dias, o aviso do dia 20 desaparece. Regras de produção preservadas.
+
 ## 2026-11-19 — descanso preventivo restaurado
 
 - Restaurado o descanso calculado em datas que uniriam blocos de trabalho antes e depois, incluindo Lara em 20/11/26.

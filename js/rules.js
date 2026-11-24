@@ -49,10 +49,10 @@ export function assessWork(employee, date, isWorking, rules = {}, includeFuture 
 }
 
 export const workRestrictions = (employee, date, isWorking, rules) =>
-  assessWork(employee, date, isWorking, rules, true).restrictions.map(reason => ({
+  assessWork(employee, date, isWorking, rules).restrictions.map(reason => ({
     ...reason,
     // Exibir o limite da regra, sem apresentar o dia de descanso como dia trabalhado.
-    message: `Descanso obrigatório em ${label(date)}: trabalhar nesta data atingiria ou ultrapassaria o limite de ${reason.short.replace('º dia seguido', ' dias seguidos')} para ${employee.name}.`
+    message: `Descanso obrigatório em ${label(date)}: o ciclo anterior de ${employee.name} exige descanso nesta data (${reason.short}).`
   }));
 export const workWarnings = (employee, date, isWorking, rules) => assessWork(employee, date, isWorking, rules).warnings;
 
