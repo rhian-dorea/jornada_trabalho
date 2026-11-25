@@ -17,23 +17,25 @@ create table public.jornadas (
 );
 \ir ../sql/007_dsr_mensal.sql
 \ir ../sql/008_feriado_nao_trabalhado.sql
+\ir ../sql/009_feriados_fora_dsr.sql
 create trigger limpar_turno_folga before insert or update on public.jornadas
 for each row execute function public.limpar_turno_folga();
 
 do $$
 declare v_id uuid := '11111111-1111-1111-1111-111111111111';
-  v_mes date; v_dias integer; v_minimo integer; v_extra date; v_primeiro date; v_segundo date; v_dia date;
+  v_mes date; v_dias integer; v_feriados integer; v_minimo integer; v_extra date; v_primeiro date; v_segundo date; v_dia date;
 begin
   foreach v_mes in array array[date '2025-02-01',date '2024-02-01',date '2026-11-01',date '2026-12-01',date '2027-02-01',date '2028-02-01'] loop
     v_dias := (v_mes+interval '1 month')::date-v_mes;
     v_minimo := public.dsr_minimo_mensal(v_mes);
+    select count(*) into v_feriados from generate_series(0,v_dias-1) g(n) where public.eh_feriado_nacional(v_mes+g.n);
     for v_dia in select v_mes+g.n from generate_series(0,v_dias-1) g(n)
-      where v_mes<date '2026-12-01' or extract(isodow from v_mes+g.n)<6
-      order by 1 limit v_dias-v_minimo loop
+      where not public.eh_feriado_nacional(v_mes+g.n) and (v_mes<date '2026-12-01' or extract(isodow from v_mes+g.n)<6)
+      order by 1 limit v_dias-v_minimo-v_feriados loop
       insert into public.jornadas(funcionario_id,data,situacao) values(v_id,v_dia,'trabalho');
     end loop;
     select min(v_mes+g.n) into v_extra from generate_series(0,v_dias-1) g(n)
-      where (v_mes<date '2026-12-01' or extract(isodow from v_mes+g.n)<6)
+      where not public.eh_feriado_nacional(v_mes+g.n) and (v_mes<date '2026-12-01' or extract(isodow from v_mes+g.n)<6)
         and not exists(select 1 from public.jornadas where funcionario_id=v_id and data=v_mes+g.n);
     select min(data) into v_primeiro from public.jornadas where funcionario_id=v_id and data>=v_mes and data<v_mes+interval '1 month';
     select min(data) into v_segundo from public.jornadas where funcionario_id=v_id and data>v_primeiro and data<v_mes+interval '1 month';

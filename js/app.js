@@ -1,10 +1,11 @@
+import { calendarStatus } from './dsr-date.js?v=20261125-dsr3';
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
-import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261124-dsr1';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr3';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js?v=20261119-2';
-import { summarizeEmployeeMonth } from './monthly-summary.js';
-import { monthlyDsr, validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261124-dsr1';
-import { holidayFor } from './holidays.js?v=20261124-dsr1';
+import { summarizeEmployeeMonth } from './monthly-summary.js?v=20261125-dsr3';
+import { monthlyDsr, validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr3';
+import { holidayFor } from './holidays.js?v=20261125-dsr3';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -19,9 +20,9 @@ const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+String(d.getFullYear())
 let S={emps:[],rec:{},versions:{},empVersions:{},settings:normalizeSettings()};
 const legacyBrandColors=new Set(['#2457a7','#146e67']);
 let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, modalReturnFocus=null;
-const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
+const st=(id,d)=>calendarStatus((S.rec[id]||{})[key(d)]||'',d);
 const W=(id,d)=>st(id,d)==='T';
-const restrictionsOn=(e,d)=>st(e.id,d)?[]:[...workRestrictions(e,d,W,S.settings.regras),...weeklyRestRestrictions(e,d,st)];
+const restrictionsOn=(e,d)=>st(e.id,d)||holidayOn(d)?[]:[...workRestrictions(e,d,W,S.settings.regras),...weeklyRestRestrictions(e,d,st)];
 const holidayOn=d=>holidayFor(d);
 const warningsOn=(e,d)=>workWarnings(e,d,W,S.settings.regras);
 const check=(e,d)=>validateMonthlyDsrWork(e,d,W,st)||validate5x2Work(e,d,st)||validateWork(e,d,W,S.settings.regras);
@@ -82,7 +83,7 @@ function renderMonthSummary(){
   const dates=Array.from({length:days},(_,i)=>new Date(y,m,i+1));
   const entries=S.emps.filter(e=>e.ativo||dates.some(d=>st(e.id,d))).map(e=>({employee:e,summary:summarizeEmployeeMonth(e,dates,st,restrictionsOn),dsr:monthlyDsr(e,D,st,restrictionsOn)})).filter(({employee:e,summary:s})=>e.ativo||s.worked+s.notWorked>0);
   const title='<div class="month-summary-head"><div><span class="eyebrow">Por funcionário</span><h3>Resumo de '+MN[m].toLocaleLowerCase('pt-BR')+' de '+y+'</h3></div><span class="month-summary-count">'+entries.length+' pessoa'+(entries.length===1?'':'s')+'</span></div>';
-  const note='<p class="month-summary-note">Mínimo: 4 DSR até novembro/2026; 9 desde dezembro/2026. Escala 5×2 a partir de 16/12/26. Folga e descanso automático contam uma vez por data, inclusive quando coincidem com feriado. Feriado, por si só, não soma DSR; dias vazios não contam.</p>';
+  const note='<p class="month-summary-note">Mínimo: 4 DSR até novembro/2026; 9 desde dezembro/2026. Escala 5×2 a partir de 16/12/26. Feriados nacionais não somam DSR, inclusive Folgas antigas nessas datas. Folga e descanso em outros dias contam uma vez; dias vazios não contam.</p>';
   const rows=entries.map(({employee:e,summary:s,dsr})=>{
     return '<tr><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td><span class="dsr-status '+(dsr.compliant?'complete':'pending')+'">'+(dsr.compliant?'✓':'⚠')+' '+dsr.granted+'/'+dsr.required+'<small>'+(dsr.compliant?'Mínimo atendido':'Falta'+(dsr.missing===1?'':'m')+' '+dsr.missing+' folga'+(dsr.missing===1?'':'s'))+'</small></span></td><td class="summary-worked">'+s.worked+'</td><td class="summary-not-worked">'+s.notWorked+'</td><td><span class="summary-value off">'+s.off+'</span></td><td><span class="summary-value rest">'+s.restDays+'</span></td><td><span class="summary-value sunday">'+s.restSundays+'</span></td><td><span class="summary-value holiday-off">'+s.holidayOff+'</span></td></tr>';
   }).join('');
@@ -246,7 +247,7 @@ function renderDayRows(ds){
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
     const restriction=reasons.length?'<small class="rule-note">⛔ Descanso obrigatório: '+esc(reasons.map(r=>r.message).join(' · '))+'</small>':'';
     const warning=warnings.length?'<small class="rule-warning">⚠ Aviso: '+esc(warnings.map(r=>r.message).join(' · '))+'</small>':'';
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button>'+(holidayOn(d)?'<button class="'+(c==='H'?'onh':'')+'" data-s="H" data-e="'+e.id+'"'+(!can?' disabled':'')+'>Feriado não trabalhado</button>':'')+'<button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'||c==='H'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>'+'Folga'+'</button>'+'<button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
   }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
 }
 function openDay(ds,selectedId){

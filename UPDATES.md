@@ -1,5 +1,13 @@
 # Atualizações
 
+## 2026-11-25 — feriado excluído de DSR em qualquer situação
+
+- Regra corrigida conforme orientação mais recente: feriado nacional nunca soma DSR, mesmo marcado como Folga ou com descanso por dias/domingo. Contagem mensal, semanal e resumo usam a mesma exclusão.
+- Folgas antigas em feriados aparecem como feriado não trabalhado sem alterar os registros no banco. Removido o botão de marcação Feriado não trabalhado; continuam Trabalho, Folga e Remover.
+- Limites SQL mensal/semanal também excluem as datas nacionais. Nova migração 009 para instalações que já aplicaram 007/008; aplicar antes de publicar a correção.
+- A nova política substitui a orientação anterior de contar coincidência. É regra interna, não conclusão jurídica universal.
+
+
 ## 2026-11-25 — documentação operacional e referências legais
 
 - README reorganizado com índice de guias, uso diário, contagem, transição, implantação, permissões e estrutura dos módulos.

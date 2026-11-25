@@ -8,7 +8,7 @@ Para conceitos, exemplos e análise das referências, consulte o [Guia operacion
 - Desde dezembro/2026 inteiro: mínimo de **9 DSR**, inclusive em fevereiro. É uma escolha da empresa, mais exigente que o piso de 8 de um fevereiro de 28 dias usado no exemplo da análise fornecida.
 - Desde **16/12/2026**: dois DSR por semana de segunda a domingo. Na transição, a semana 14–20/12 é conferida inteira e seus descansos anteriores a 16/12 entram na conta.
 - As regras são individuais e valem também para Supervisor e Coordenador. Na nova etapa não se permite trabalhar sete dias consecutivos. Dois descansos semanais podem ser separados; não são obrigatoriamente sábado e domingo.
-- Conta-se uma data por DSR: Folga (`F`) ou descanso automático por dias, domingos ou reserva 5×2. Dois motivos no mesmo dia não duplicam o total. Vazio sem descanso calculado não conta.
+- Conta-se uma data por DSR: Folga (`F`) ou descanso automático por dias, domingos ou reserva 5×2, sempre excluindo feriados nacionais. Dois motivos no mesmo dia não duplicam o total. Vazio sem descanso calculado não conta.
 - Trabalho e feriado não trabalhado ocupam datas que não poderão ser usadas como DSR. O navegador e o gatilho SQL bloqueiam lançamentos que deixem menos datas disponíveis que o mínimo. Escalas incompletas continuam com indicador de pendência: o sistema não escolhe nem grava folgas automaticamente.
 
 ## Feriado e DSR são separados
@@ -19,18 +19,18 @@ Não se incluem feriados estaduais, municipais ou pontos facultativos. Carnaval,
 
 | Registro individual | DSR | Dias sem trabalho |
 | --- | --- | --- |
-| Folga/descanso DSR, inclusive coincidindo com feriado | +1 | +1 |
+| Folga/descanso em dia comum | +1 | +1 |
 | Feriado não trabalhado (`H`, banco `feriado`) | +0 | +1 |
 | Apenas a marcação do feriado no cabeçalho | +0 | +0 |
 | Trabalho em feriado | +0 | +0 |
 
-Exemplo: nove DSR e um feriado não trabalhado em outra data resultam em **9 DSR e 10 dias sem trabalho**. Se o feriado coincidir com um desses DSR, continuam **9 DSR e 9 dias sem trabalho**. Não se altera a escala de outras pessoas ao marcar o feriado de um funcionário.
+Exemplo: nove DSR e um feriado não trabalhado em outra data resultam em **9 DSR e 10 dias sem trabalho**. Se um desses nove descansos cair em feriado, serão **8 DSR e 9 dias sem trabalho**; é necessário outro DSR em dia comum. Não se altera a escala de outras pessoas ao marcar o feriado de um funcionário.
 
 ## Instalação e validação
 
-1. Em homologação com os scripts 001–006, aplicar `sql/007_dsr_mensal.sql` e `sql/008_feriado_nao_trabalhado.sql`, nessa ordem, antes de usar o novo frontend. O novo tipo mantém os lançamentos `trabalho` e `folga` anteriores.
+1. Em homologação com os scripts 001–006, aplicar `sql/007_dsr_mensal.sql` e `sql/008_feriado_nao_trabalhado.sql`, nessa ordem, antes de usar o novo frontend. Aplicar também `sql/009_feriados_fora_dsr.sql` para excluir feriados da reserva de DSR. O novo tipo mantém os lançamentos `trabalho` e `folga` anteriores.
 2. Executar `npm test`. Verificar novembro (4), dezembro inteiro (9), fevereiro (9), semanas que cruzam mês/ano e a semana 14–20/12.
-3. Em feriado nacional, lançar Folga em uma pessoa e Feriado não trabalhado em outra: somente a primeira ganha DSR. Remover ou alterar o registro deve recalcular os totais.
+3. Em feriado nacional, marcar Folga para Sarah e Lara e confirmar zero DSR para ambas; descanso por dias ou domingos nessa data também deve somar zero. Remover ou alterar o registro deve recalcular os totais.
 4. Conferir os indicadores com zero DSR, mínimo atendido e falta de folgas. A visão semanal mostra DSR semanal; as células vazias restantes tornam-se descanso 5×2 quando os outros cinco dias da semana estão ocupados.
 5. `tests/dsr_mensal.sql` é exclusivo para **banco descartável vazio**: cria fixtures de tabelas, funções e roles. Foi executado em PostgreSQL 17 local e encerrado após o teste. Não executar esse arquivo de testes no banco real.
 

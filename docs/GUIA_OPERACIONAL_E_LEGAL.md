@@ -13,7 +13,7 @@ Este guia explica a operação do sistema e relaciona seus controles às fontes 
 | Situação | Registro no banco | Consequência operacional |
 | --- | --- | --- |
 | Trabalho | `trabalho` | Conta dia de trabalho |
-| Folga | `folga` | Conta um DSR e um dia sem trabalho |
+| Folga | `folga` | Em dia comum soma DSR; em feriado soma somente dia sem trabalho |
 | Descanso obrigatório | Calculado, sem gravação automática | Conta um DSR; pode desaparecer com a alteração da escala |
 | Feriado não trabalhado | `feriado` | Conta um dia sem trabalho, sem DSR adicional |
 | Vazio sem descanso calculado | Nenhum | Não confirma trabalho nem DSR |
@@ -74,11 +74,11 @@ Um feriado no cabeçalho não interrompe a sequência quando existe Trabalho gra
 | Escala individual | Total de DSR | Dias sem trabalho confirmados/calculados |
 | --- | ---: | ---: |
 | Nove DSR, sem outro afastamento | 9 | 9 |
-| Um feriado coincide com um dos nove DSR | 9 | 9 |
+| Um feriado coincide com um dos nove descansos | 8 | 9 |
 | Nove DSR e outro dia registrado como Feriado não trabalhado | 9 | 10 |
 | Nove DSR e Trabalho no feriado | 9 | 9 |
 
-Para uma terça-feira em que a pessoa trabalharia, mas a empresa fechou pelo feriado, use **Feriado não trabalhado**. Se a data já era DSR, mantenha a situação de DSR. Não troque todos os descansos coincidentes com feriados pelo novo tipo: isso retiraria DSR da contagem.
+Na marcação diária, use Trabalho, Folga ou Remover. Folga em feriado nacional será exibida como feriado não trabalhado e soma zero DSR. O mesmo vale para descanso por dias seguidos ou domingos nessa data. Esta política interna substitui a regra anterior de coincidência: nenhum feriado entra no contador.
 
 A distinção acima descreve a classificação operacional definida para o sistema. A remuneração ou compensação de trabalho em feriado é matéria própria: a Lei 605/1949, art. 9º, disciplina pagamento em dobro ou outra folga nas hipóteses ali previstas. A aplicação não calcula folha nem quita essas obrigações. [Lei 605/1949](https://www.planalto.gov.br/ccivil_03/leis/l0605.htm).
 
@@ -130,7 +130,7 @@ Não são apurados: horas efetivas, intervalos por horário, remuneração, comp
 
 ## 8. Implantação e rastreabilidade
 
-Com 001–006 já aplicados, executar **007 e depois 008** em homologação antes de publicar o frontend desta branch. A primeira migração adiciona os limites DSR/5×2; a segunda permite Feriado não trabalhado e mantém Trabalho/Folga. Nenhuma delas reescreve jornadas existentes.
+Com 001–006 já aplicados, executar **007, 008 e depois 009** em homologação antes de publicar o frontend desta branch. Depois, aplicar `009_feriados_fora_dsr.sql` para a exclusão dos feriados de DSR. A primeira migração adiciona os limites DSR/5×2; a segunda permite Feriado não trabalhado e mantém Trabalho/Folga. Nenhuma delas reescreve jornadas existentes.
 
 O planejamento ocorre no navegador, mas o banco aplica a validação definitiva. RPCs conferem acesso e versão do registro; os gatilhos verificam regras e registram auditoria. Uma gravação recusada não é confirmada.
 

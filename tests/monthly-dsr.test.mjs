@@ -4,19 +4,33 @@ import { monthlyDsr, validateMonthlyDsrWork, weeklyDsr, validate5x2Work, weeklyR
 import { requiredMonthlyDsr } from '../js/schedule-policy.js';
 import { summarizeEmployeeMonth } from '../js/monthly-summary.js';
 import { nationalHolidays, holidayFor } from '../js/holidays.js';
+import { calendarStatus } from '../js/dsr-date.js';
 
 const employee = { id: 'lara', name: 'Lara' };
 const date = (year, month, day) => new Date(year, month - 1, day);
 
+test('Sarah e Lara: Folga ou descanso por dias e domingos em 20/11 soma zero DSR', () => {
+  const holiday=date(2026,11,20),reasons=()=>[{kind:'dias'},{kind:'domingo'}];
+  for(const name of ['Sarah','Lara'])for(const status of ['F','H','']){
+    const person={id:name,name};
+    const read=(_id,d)=>+d===+holiday?status:'T';
+    assert.equal(monthlyDsr(person,holiday,read,reasons).granted,0);
+    assert.equal(weeklyDsr(person,holiday,read,reasons).granted,0);
+    assert.equal(summarizeEmployeeMonth(person,[holiday],read,reasons).rest,0);
+  }
+  assert.equal(calendarStatus('F',holiday),'H');
+  assert.equal(calendarStatus('F',date(2026,11,24)),'F');
+});
+
 test('DSR soma folga e descansos, conta data com dois motivos uma vez e ignora vazio', () => {
-  const statuses = new Map([[1,'F'],[2,'F'],[3,'T']]);
+  const statuses = new Map([[1,'F'],[3,'F'],[6,'T']]);
   const reasons = (_e,d) => d.getDate() === 4 ? [{kind:'dias'},{kind:'domingo'}]
     : d.getDate() === 5 ? [{kind:'domingo'}] : [];
   const result = monthlyDsr(employee,date(2026,11,1),(_id,d)=>statuses.get(d.getDate())||'',reasons);
   assert.equal(result.granted,4);
   assert.equal(result.missing,0);
   assert.equal(result.compliant,true);
-  statuses.delete(2);
+  statuses.delete(3);
   const corrected = monthlyDsr(employee,date(2026,11,1),(_id,d)=>statuses.get(d.getDate())||'',reasons);
   assert.equal(corrected.granted,3);
   assert.equal(corrected.missing,1);
@@ -31,15 +45,33 @@ test('todos os funcionários começam com quatro DSR pendentes; feriado sozinho 
   assert.ok(holidayFor(date(2026,11,20)));
 });
 
+test('feriado vazio com regra de descanso não soma DSR mensal, semanal nem descanso no resumo', () => {
+  const d=date(2026,11,15), reasons=()=>[{kind:'dias'},{kind:'domingo'}];
+  const read=(_id,day)=>+day===+d?'':'T';
+  assert.ok(holidayFor(d));
+  assert.equal(monthlyDsr(employee,d,read,reasons).granted,0);
+  assert.equal(weeklyDsr(employee,d,read,reasons).granted,0);
+  assert.equal(summarizeEmployeeMonth(employee,[d],read,reasons).rest,0);
+  for(const status of ['H','T']){
+    const recorded=()=>status;
+    assert.equal(monthlyDsr(employee,d,recorded,reasons).granted,0);
+    assert.equal(weeklyDsr(employee,d,recorded,reasons).granted,0);
+  }
+  assert.equal(monthlyDsr(employee,d,(_id,day)=>+day===+d?'F':'T',reasons).granted,0);
+  assert.equal(summarizeEmployeeMonth(employee,[d],()=> 'F',reasons).holidayOff,1);
+});
+
 test('mínimo mensal reserva o número exigido em meses de 28, 29, 30 e 31 dias', () => {
   for(const [year,month] of [[2025,2],[2024,2],[2026,11],[2026,12],[2027,2],[2028,2]]){
     const days=new Date(year,month,0).getDate();
     const required=requiredMonthlyDsr(date(year,month,1));
-    const working=(_id,d)=>d.getFullYear()===year&&d.getMonth()===month-1&&d.getDate()<=days-required-1;
-    assert.equal(validateMonthlyDsrWork(employee,date(year,month,days-required),working),'');
-    const filled=(_id,d)=>d.getFullYear()===year&&d.getMonth()===month-1&&d.getDate()<=days-required;
-    assert.match(validateMonthlyDsrWork(employee,date(year,month,days-required+1),filled),new RegExp(`${required} folgas DSR`));
-    assert.equal(validateMonthlyDsrWork(employee,date(year,month,1),filled),'');
+    const eligible=Array.from({length:days},(_,i)=>date(year,month,i+1)).filter(d=>!holidayFor(d));
+    const available=eligible.length-required;
+    const working=(_id,d)=>eligible.slice(0,available-1).some(x=>+x===+d);
+    assert.equal(validateMonthlyDsrWork(employee,eligible[available-1],working),'');
+    const filled=(_id,d)=>eligible.slice(0,available).some(x=>+x===+d);
+    assert.match(validateMonthlyDsrWork(employee,eligible[available],filled),new RegExp(`${required} folgas DSR`));
+    assert.equal(validateMonthlyDsrWork(employee,eligible[0],filled),'');
   }
 });
 
@@ -57,7 +89,7 @@ test('9 DSR mais um feriado não trabalhado são 10 dias sem trabalho, sem DSR e
   assert.equal(summary.notWorked,10);
   assert.equal(summary.holidayOff,1);
   const coinciding=(_id,d)=>d.getDate()<=9?'F':'T';
-  assert.equal(monthlyDsr(employee,dates[0],coinciding,()=>[]).granted,9);
+  assert.equal(monthlyDsr(employee,dates[0],coinciding,()=>[]).granted,8);
   assert.equal(summarizeEmployeeMonth(employee,dates,coinciding,()=>[]).notWorked,9);
 });
 

@@ -4,7 +4,7 @@ Planejamento de trabalho, folgas e descanso semanal remunerado (DSR), com calend
 
 **Stack:** HTML, CSS e JavaScript em módulos; Supabase Auth e PostgreSQL. O frontend é estático, sem etapa de build.
 
-> Esta documentação descreve a branch `codex/dsr-quatro-folgas-mensais`. Recursos novos dependem das migrações 007 e 008. Publicar o código não executa scripts SQL nem substitui os dados cadastrados no banco.
+> Esta documentação descreve a branch `codex/dsr-quatro-folgas-mensais`. Recursos novos dependem das migrações 007, 008 e 009. Publicar o código não executa scripts SQL nem substitui os dados cadastrados no banco.
 
 ## Documentação
 
@@ -33,7 +33,7 @@ Nesta versão não há tela de Administração/Configurações, cadastro de hor�
 1. Entre com uma conta autorizada. Não há cadastro público de usuários.
 2. Abra **Escalas**, selecione Mensal ou Semanal e navegue pelas datas. **Hoje** retorna ao período atual.
 3. No mês, clique no dia para consultar a equipe daquela data. Na semana, clique na célula para consultar o funcionário da linha.
-4. Escolha **Trabalho**, **Folga**, **Feriado não trabalhado** ou **Remover**, conforme as permissões. O botão de feriado aparece somente em feriado nacional.
+4. Escolha **Trabalho**, **Folga** ou **Remover**, conforme as permissões. Folga marcada em feriado é exibida como feriado não trabalhado e soma zero DSR.
 5. Confira o resumo de DSR e os avisos antes de considerar a escala concluída.
 6. Use **Funcionários → Novo funcionário** para cadastrar pessoas, caso seu perfil seja Administrador.
 
@@ -44,13 +44,13 @@ Após uma gravação, os dados são recarregados. A aba visível também sincron
 | Situação | Origem | Soma DSR? | Soma dia sem trabalho? |
 | --- | --- | --- | --- |
 | Trabalho | Lançamento gravado | Não | Não |
-| Folga | Lançamento gravado | Sim, uma data | Sim |
-| Descanso obrigatório | Cálculo da escala | Sim, uma data | Sim |
+| Folga | Lançamento gravado | Sim, fora de feriado | Sim |
+| Descanso obrigatório | Cálculo da escala | Sim, fora de feriado | Sim |
 | Feriado não trabalhado | Lançamento individual gravado | Não | Sim |
 | Apenas o feriado no cabeçalho | Calendário nacional | Não | Não |
 | Vazio sem descanso calculado | Nenhum lançamento | Não | Não confirmado |
 
-Dois motivos de descanso no mesmo dia não duplicam o total. **9 DSR + 1 feriado não trabalhado em outra data = 10 dias sem trabalho**. Se o feriado coincidir com um desses DSR, permanecem 9 DSR e 9 dias sem trabalho.
+Dois motivos de descanso no mesmo dia não duplicam o total. **9 DSR + 1 feriado não trabalhado em outra data = 10 dias sem trabalho**. Se um dos nove descansos cair em feriado, o total será 8 DSR e 9 dias sem trabalho.
 
 O descanso calculado não grava uma folga no banco. Ele pode mudar quando a escala muda. Nos dias de descanso calculado ou de exceção, a interface desabilita o lançamento de Folga porque o estado já está indicado; registros antigos podem ser corrigidos.
 
@@ -90,7 +90,7 @@ Podem existir vários administradores, cada um com sua própria conta no Supabas
 
 **Requisitos:** projeto Supabase configurado, servidor HTTP local e acesso à CDN do SDK. Node.js é necessário para os testes, não para compilar a aplicação.
 
-1. Siga o [guia de configuração](docs/CONFIGURACAO_SUPABASE.md). Em banco novo, aplique os scripts **001 a 008 na ordem**. Em banco existente com 001–006, aplique somente **007 e depois 008** em homologação antes da produção.
+1. Siga o [guia de configuração](docs/CONFIGURACAO_SUPABASE.md). Em banco novo, aplique os scripts **001 a 009 na ordem**. Em banco existente com 001–006, aplique somente **007, 008 e depois 009** em homologação antes da produção.
 2. Configure a URL e a **chave publicável** em `js/config.js`. Nunca inclua senha de banco ou chave `service_role` no frontend.
 3. Crie a conta inicial no Supabase Auth e seu perfil Administrador.
 4. Inicie um servidor na raiz:
