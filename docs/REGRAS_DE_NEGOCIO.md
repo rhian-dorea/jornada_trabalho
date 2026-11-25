@@ -4,8 +4,8 @@ Referência desta branch: [Guia operacional e legal](GUIA_OPERACIONAL_E_LEGAL.md
 
 
 - `trabalho` equivale a `T`; `folga` equivale a `F`; `feriado` equivale a `H` (feriado não trabalhado, sem somar DSR). Dia sem lançamento não conta como trabalho.
-- Para os cargos comuns, são permitidos até seis dias consecutivos de trabalho; o sétimo é rejeitado. Antes de 16/12/2026, o código mantém a exceção histórica de Supervisor/Coordenador para o sétimo dia, com aviso; o oitavo é rejeitado. Na nova etapa, sete dias consecutivos são rejeitados para todos. A exceção histórica não é autorização legal por cargo. O banco verifica as janelas que cruzam o lançamento, inclusive em inserções retroativas e viradas de semana, mês e ano.
-- Para funcionárias de cargos comuns, dois domingos consecutivos de trabalho são rejeitados. Para Supervisor e Coordenador, independentemente do sexo, o segundo domingo é permitido e aparece em vermelho com o motivo; o terceiro domingo consecutivo é rejeitado. A checagem considera domingos de meses diferentes e lançamentos retroativos.
+- Todos os cargos podem trabalhar no máximo seis dias consecutivos; o sétimo é bloqueado. A validação inclui ambos os lados de uma edição e cruza meses e anos.
+- Para mulheres, o segundo domingo consecutivo de trabalho é bloqueado em qualquer cargo. Homens não têm bloqueio de domingos consecutivos. O descanso dominical só soma DSR fora de feriado nacional.
 - As telas mensal e semanal mostram trabalho, folga e descanso necessário calculado a partir da escala. Dias excepcionais permitidos aparecem em vermelho com o motivo. Nesses dias e nos dias de descanso necessário, o botão Folga fica indisponível; lançamentos de folga anteriores continuam visíveis e podem ser corrigidos pelo fluxo normal. Alterar sexo ou cargo é rejeitado se passar a invalidar jornadas existentes.
 - O cadastro usa apenas Supervisor e Coordenador como nomes padrão. Cargos antigos no feminino são exibidos com o nome masculino e o script `005_normalizar_cargos.sql` atualiza os registros existentes no banco.
 - Gravação, alteração e remoção passam pelos mesmos gatilhos. Uma folga ou exclusão de lançamento não é contabilizada como trabalho. A auditoria registra correções e remoções.
@@ -26,3 +26,14 @@ Essas regras são requisitos operacionais do sistema e não representam, isolada
 - Somente os feriados nacionais são exibidos. O feriado no cabeçalho não altera registros individuais.
 
 As migrações `007_dsr_mensal.sql` e `008_feriado_nao_trabalhado.sql` são necessárias para a proteção no banco e o novo tipo de lançamento. Os [limites de conformidade e fontes oficiais](GUIA_OPERACIONAL_E_LEGAL.md#7-referências-legais-e-alcance) devem ser lidos junto dessas regras.
+
+
+## Atualização de 25/11/2026 — análise individual e regras uniformes
+
+O calendário fica acima da análise mensal. Cada funcionário tem listas separadas de datas DSR e feriados, com totais próprios e indicação de feriado trabalhado, não trabalhado ou sem lançamento. Nenhuma data de feriado entra em DSR.
+
+Sete dias consecutivos são bloqueados para todos os cargos, inclusive antes da transição 5×2. Dois domingos consecutivos são bloqueados somente para mulheres, sem exceção de cargo. Homens não têm bloqueio de domingos consecutivos. Ambas as verificações cruzam o mês e o ano e consideram lançamentos retroativos.
+
+Em feriado de descanso, o motivo de sete dias ou dois domingos permanece visível, mas o dia é classificado como feriado e soma zero DSR. Ao marcar Folga num feriado, o novo registro é salvo como `feriado`. O estado dos registros antigos é apresentado corretamente sem reescrevê-los.
+
+Aplicar `sql/010_seis_dias_domingos_mulheres.sql` após 009 para alinhar a validação do banco. Esta atualização substitui as descrições anteriores de exceções por cargo. As metas mensais de 4/9 e a data da etapa 5×2 permanecem as já definidas.

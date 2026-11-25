@@ -110,7 +110,7 @@ Os arts. 66 e 67 da CLT tratam, respectivamente, do intervalo mínimo de 11 hora
 
 A Lei 605/1949 trata do descanso semanal remunerado e dos feriados. A quantidade mensal isolada não substitui a verificação do repouso semanal. [Lei 605/1949, art. 1º](https://www.planalto.gov.br/ccivil_03/leis/l0605.htm).
 
-O Tema 265 do TST reafirma que conceder o repouso após o sétimo dia consecutivo de trabalho viola a garantia constitucional e implica pagamento em dobro. O sistema mantém exceções antigas por cargo antes da transição, mas o título de Supervisor ou Coordenador **não é autorização legal genérica** para sete dias seguidos. [TST, Tema 265](https://www.tst.jus.br/documents/d/guest/irr265-2-pdf).
+O Tema 265 do TST reafirma que conceder o repouso após o sétimo dia consecutivo de trabalho viola a garantia constitucional e implica pagamento em dobro. As exceções antigas por cargo foram removidas; o título de Supervisor ou Coordenador **não é autorização legal genérica** para sete dias seguidos. [TST, Tema 265](https://www.tst.jus.br/documents/d/guest/irr265-2-pdf).
 
 ### Transição para dois repousos semanais
 
@@ -130,7 +130,7 @@ Não são apurados: horas efetivas, intervalos por horário, remuneração, comp
 
 ## 8. Implantação e rastreabilidade
 
-Com 001–006 já aplicados, executar **007, 008 e depois 009** em homologação antes de publicar o frontend desta branch. Depois, aplicar `009_feriados_fora_dsr.sql` para a exclusão dos feriados de DSR. A primeira migração adiciona os limites DSR/5×2; a segunda permite Feriado não trabalhado e mantém Trabalho/Folga. Nenhuma delas reescreve jornadas existentes.
+Com 001–006 já aplicados, executar **007, 008, 009 e depois 010** em homologação antes de publicar o frontend desta branch. Depois, aplicar `009_feriados_fora_dsr.sql` para a exclusão dos feriados de DSR. A primeira migração adiciona os limites DSR/5×2; a segunda permite Feriado não trabalhado e mantém Trabalho/Folga. Nenhuma delas reescreve jornadas existentes.
 
 O planejamento ocorre no navegador, mas o banco aplica a validação definitiva. RPCs conferem acesso e versão do registro; os gatilhos verificam regras e registram auditoria. Uma gravação recusada não é confirmada.
 
@@ -144,3 +144,14 @@ O planejamento ocorre no navegador, mas o banco aplica a validação definitiva.
 | Proteção no PostgreSQL | `sql/007_dsr_mensal.sql` e `sql/008_feriado_nao_trabalhado.sql` |
 
 Para validar a aplicação, seguir [DSR e testes da transição](DSR_5X2.md), [Configuração do Supabase](CONFIGURACAO_SUPABASE.md) e [matriz de homologação](../tests/VALIDACAO_SUPABASE.md). O arquivo `tests/dsr_mensal.sql` cria fixtures e só deve ser usado em banco descartável vazio.
+
+
+## Atualização de 25/11/2026 — análise individual e regras uniformes
+
+O calendário fica acima da análise mensal. Cada funcionário tem listas separadas de datas DSR e feriados, com totais próprios e indicação de feriado trabalhado, não trabalhado ou sem lançamento. Nenhuma data de feriado entra em DSR.
+
+Sete dias consecutivos são bloqueados para todos os cargos, inclusive antes da transição 5×2. Dois domingos consecutivos são bloqueados somente para mulheres, sem exceção de cargo. Homens não têm bloqueio de domingos consecutivos. Ambas as verificações cruzam o mês e o ano e consideram lançamentos retroativos.
+
+Em feriado de descanso, o motivo de sete dias ou dois domingos permanece visível, mas o dia é classificado como feriado e soma zero DSR. Ao marcar Folga num feriado, o novo registro é salvo como `feriado`. O estado dos registros antigos é apresentado corretamente sem reescrevê-los.
+
+Aplicar `sql/010_seis_dias_domingos_mulheres.sql` após 009 para alinhar a validação do banco. Esta atualização substitui as descrições anteriores de exceções por cargo. As metas mensais de 4/9 e a data da etapa 5×2 permanecem as já definidas.

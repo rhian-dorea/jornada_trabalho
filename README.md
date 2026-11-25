@@ -64,7 +64,7 @@ O descanso calculado não grava uma folga no banco. Ele pode mudar quando a esca
 
 A semana de transição é **14–20/12/2026**: seus descansos anteriores a 16/12 entram na conferência semanal. O código bloqueia lançamentos que consumam as datas necessárias para atingir o mínimo. Enquanto as folgas não forem lançadas ou calculadas como descanso obrigatório, o indicador permanece pendente. Não existe geração automática de uma escala completa.
 
-Antes da transição, os padrões do sistema permitem até seis dias de trabalho para cargos comuns e uma exceção de sete dias para Supervisor/Coordenador com aviso. Na nova etapa, sete dias consecutivos ficam bloqueados para todos. As regras dominicais antigas permanecem no código e não cobrem, por si só, todas as exigências de categoria.
+Todos os cargos têm bloqueio de sete dias consecutivos. O revezamento que impede dois domingos consecutivos aplica-se somente às mulheres, sem exceção por cargo; homens não recebem esse bloqueio. As verificações incluem viradas de mês e ano e inserções retroativas.
 
 **Limite mensal e aprovação no sistema não comprovam conformidade trabalhista.** As metas de 4/9, o tratamento de dezembro inteiro e as exceções antigas são regras do produto. O [guia legal](docs/GUIA_OPERACIONAL_E_LEGAL.md) explica as diferenças, as fontes e o que a aplicação ainda não valida.
 
@@ -90,7 +90,7 @@ Podem existir vários administradores, cada um com sua própria conta no Supabas
 
 **Requisitos:** projeto Supabase configurado, servidor HTTP local e acesso à CDN do SDK. Node.js é necessário para os testes, não para compilar a aplicação.
 
-1. Siga o [guia de configuração](docs/CONFIGURACAO_SUPABASE.md). Em banco novo, aplique os scripts **001 a 009 na ordem**. Em banco existente com 001–006, aplique somente **007, 008 e depois 009** em homologação antes da produção.
+1. Siga o [guia de configuração](docs/CONFIGURACAO_SUPABASE.md). Em banco novo, aplique os scripts **001 a 010 na ordem**. Em banco existente com 001–006, aplique somente **007, 008, 009 e depois 010** em homologação antes da produção.
 2. Configure a URL e a **chave publicável** em `js/config.js`. Nunca inclua senha de banco ou chave `service_role` no frontend.
 3. Crie a conta inicial no Supabase Auth e seu perfil Administrador.
 4. Inicie um servidor na raiz:
@@ -140,3 +140,14 @@ A suíte cobre sequências de trabalho, domingos, correções retroativas, DSR m
 | `docs/`, `tests/` | Guias, fontes e testes |
 
 O HTML original com dados de demonstração permanece fora do versionamento.
+
+
+## Atualização de 25/11/2026 — análise individual e regras uniformes
+
+O calendário fica acima da análise mensal. Cada funcionário tem listas separadas de datas DSR e feriados, com totais próprios e indicação de feriado trabalhado, não trabalhado ou sem lançamento. Nenhuma data de feriado entra em DSR.
+
+Sete dias consecutivos são bloqueados para todos os cargos, inclusive antes da transição 5×2. Dois domingos consecutivos são bloqueados somente para mulheres, sem exceção de cargo. Homens não têm bloqueio de domingos consecutivos. Ambas as verificações cruzam o mês e o ano e consideram lançamentos retroativos.
+
+Em feriado de descanso, o motivo de sete dias ou dois domingos permanece visível, mas o dia é classificado como feriado e soma zero DSR. Ao marcar Folga num feriado, o novo registro é salvo como `feriado`. O estado dos registros antigos é apresentado corretamente sem reescrevê-los.
+
+Aplicar `sql/010_seis_dias_domingos_mulheres.sql` após 009 para alinhar a validação do banco. Esta atualização substitui as descrições anteriores de exceções por cargo. As metas mensais de 4/9 e a data da etapa 5×2 permanecem as já definidas.

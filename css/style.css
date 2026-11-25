@@ -435,3 +435,11 @@ td.h { background: var(--fb); }
 .day-group.holiday-off .group-label { color: var(--fbt); }
 .holiday-legend { color: var(--holiday-text); }
 .week-dsr.pending { color: var(--dg); }.week-dsr.complete { color: var(--fbt); }
+.month-summary { margin-top: 24px; }
+.month-summary-scroll { max-height: 65vh; }
+.analysis-dates { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 260px; margin: 8px auto 0; }
+.analysis-date { padding: 4px 6px; border-radius: 5px; background: var(--fb); color: var(--fbt); font-size: 10px; white-space: nowrap; }
+.analysis-holidays { margin: 8px 0 0; padding: 0; list-style: none; text-align: left; }
+.analysis-holidays li { margin: 6px 0; line-height: 1.5; }
+.analysis-holidays small, .month-summary td > small { display: block; color: var(--mut); margin-top: 3px; }
+.month-summary td { vertical-align: top; }

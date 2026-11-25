@@ -1,5 +1,13 @@
 # Atualizações
 
+## 2026-11-25 — regras uniformes e análise abaixo do calendário
+
+- Bloqueio de sete dias para todos; bloqueio de dois domingos apenas para mulheres, independentemente do cargo, com verificação entre meses e anos. Migração 010 alinha PostgreSQL.
+- Feriado de descanso mantém o motivo de dias/domingo, mas soma zero DSR. Novas Folgas em feriado são gravadas como feriado.
+- Calendário acima da análise, com datas e totais de DSR e feriados separados por funcionário. Cores dos nomes preservadas.
+- 34 testes JavaScript e testes PostgreSQL de sexo, cargo e virada de mês aprovados.
+
+
 ## 2026-11-25 — cor de feriado restrita ao calendário
 
 - As caixinhas de funcionários em folga no feriado voltam ao verde de Folga, inclusive os estados equivalentes na semana e no detalhe. Trabalho e descanso mantêm suas cores habituais.

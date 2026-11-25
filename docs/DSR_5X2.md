@@ -48,3 +48,14 @@ Fontes oficiais consultadas em 24/11/2026:
 - [Orientação oficial do MTE de 23/11/2026](https://www.gov.br/trabalho-e-emprego/pt-br/noticias-e-conteudo/2026/novembro/governo-federal-publica-portaria-com-regras-complementares-para-aplicacao-da-escala-5x2): início geral em 16/12/2026, limites de horas e condições de negociação coletiva. A notícia não apresenta a coincidência de feriado/DSR como uma regra de soma; a aplicação de cada situação deve considerar a legislação e a categoria.
 - [Lei 10.607/2002](https://www2.camara.leg.br/legin/fed/lei/2002/lei-10607-19-dezembro-2002-473572-publicacaooriginal-1-pl.html), [Lei 6.802/1980](https://www.planalto.gov.br/ccivil_03/leis/l6802.htm) e [Lei 14.759/2023](https://normas.leg.br/?urn=urn:lex:br:federal:lei:2023-12-21;14759): feriados nacionais.
 - [Lei 9.093/1995](https://www.planalto.gov.br/ccivil_03/leis/l9093.htm): âmbito estadual/municipal e feriados religiosos.
+
+
+## Atualização de 25/11/2026 — análise individual e regras uniformes
+
+O calendário fica acima da análise mensal. Cada funcionário tem listas separadas de datas DSR e feriados, com totais próprios e indicação de feriado trabalhado, não trabalhado ou sem lançamento. Nenhuma data de feriado entra em DSR.
+
+Sete dias consecutivos são bloqueados para todos os cargos, inclusive antes da transição 5×2. Dois domingos consecutivos são bloqueados somente para mulheres, sem exceção de cargo. Homens não têm bloqueio de domingos consecutivos. Ambas as verificações cruzam o mês e o ano e consideram lançamentos retroativos.
+
+Em feriado de descanso, o motivo de sete dias ou dois domingos permanece visível, mas o dia é classificado como feriado e soma zero DSR. Ao marcar Folga num feriado, o novo registro é salvo como `feriado`. O estado dos registros antigos é apresentado corretamente sem reescrevê-los.
+
+Aplicar `sql/010_seis_dias_domingos_mulheres.sql` após 009 para alinhar a validação do banco. Esta atualização substitui as descrições anteriores de exceções por cargo. As metas mensais de 4/9 e a data da etapa 5×2 permanecem as já definidas.
