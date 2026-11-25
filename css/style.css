@@ -6,6 +6,8 @@
   --card: #fff;
   --soft: #f6f8fc;
   --weekend: #edf3fa;
+  --holiday-bg: #fff5de;
+  --holiday-text: #775016;
   --tx: #1b2a41;
   --mut: #586982;
   --bd: #dbe3ee;
@@ -28,6 +30,8 @@
   --bg: #0d1725; --card: #18283d; --soft: #21354f; --tx: #eef5ff;
   --mut: #b4c5db; --bd: #3a506a; --navy: #edf4fe; --navy2: #a9c8ed;
   --weekend: #20334b;
+  --holiday-bg: #403420;
+  --holiday-text: #ffe0a1;
   --tb: #233f5e; --tbt: #d2e7ff; --fb: #203d34; --fbt: #b9e5c8;
   --dgb: #4b2933; --dg: #ffc1cf; --ok: #25835d;
   --warn: #ffd2aa; --warn-bg: #51352a;
@@ -376,6 +380,10 @@ td.t .cell-status { border-left-width: 3px; border-left-style: solid; }
 .month-summary tbody tr:hover th, .month-summary tbody tr:hover td { box-shadow: inset 0 1px var(--bd), inset 0 -1px var(--bd); }
 .month-summary-empty { margin: 0; padding: 15px 16px; border-top: 1px solid var(--bd); color: var(--mut); font-size: 12px; }
 .month-summary-scroll:focus-visible { outline: 3px solid #79a8db; outline-offset: -3px; }
+.dsr-status { display: inline-block; min-width: 100px; padding: 6px 9px; border-radius: 8px; font-weight: 800; white-space: nowrap; }
+.dsr-status small { display: block; margin-top: 3px; font-size: 10px; font-weight: 600; }
+.dsr-status.complete { background: var(--fb); color: var(--fbt); }
+.dsr-status.pending { background: var(--dgb); color: var(--dg); }
 .week-mobile { display: none; }
 td.c { min-width: 126px; }
 .cell-status { max-width: none; white-space: normal; }
@@ -416,3 +424,53 @@ td.exception .cell-status,.status-pill.exception,.day-summary .summary-warning {
 .mobile-day.weekend h3 { background: var(--weekend); }
 .sc thead th:nth-child(7), .sc thead th:nth-child(8) { box-shadow: inset 0 3px var(--bd); }
 .sc thead th.today-col { box-shadow: inset 0 3px var(--navy2); }
+.cal .d.holiday-day, .sc thead th.holiday-col, .sc tbody td.z.holiday-col,
+.mobile-day.holiday-day h3 { background: var(--holiday-bg); }
+.holiday { display: block; margin: 4px 0; padding: 4px 6px; border-radius: 5px; background: var(--holiday-bg); color: var(--holiday-text); font-size: 10px; font-weight: 750; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.sc tbody td.holiday-col { border-right-color: var(--holiday-text); }
+.day-group.holiday-off .person-chip { background: var(--fb); color: var(--tx); border-color: #d2e8cf; border-left: 3px solid var(--fbt); }
+.status-pill.h, td.h .cell-status { background: var(--fb); color: var(--fbt); }
+td.h { background: var(--fb); }
+.summary-value.holiday-off, .day-summary .summary-holiday { background: var(--holiday-bg); color: var(--holiday-text); }
+.day-group.holiday-off .group-label { color: var(--fbt); }
+.holiday-legend { color: var(--holiday-text); }
+.week-dsr.pending { color: var(--dg); }.week-dsr.complete { color: var(--fbt); }
+.month-summary { margin-top: 24px; }
+.month-summary-scroll { max-height: 65vh; }
+.analysis-dates { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 260px; margin: 8px auto 0; }
+.analysis-date { padding: 4px 6px; border-radius: 5px; background: var(--fb); color: var(--fbt); font-size: 10px; white-space: nowrap; }
+.analysis-holidays { margin: 8px 0 0; padding: 0; list-style: none; text-align: left; }
+.analysis-holidays li { margin: 6px 0; line-height: 1.5; }
+.analysis-holidays small, .month-summary td > small { display: block; color: var(--mut); margin-top: 3px; }
+.month-summary td { vertical-align: top; }
+/* Motivos de dias/domingo têm prioridade sobre as cores de Folga e feriado. */
+.day-group .person-chip.rule-alert,
+.status-pill.rule-alert, td.rule-alert, td.rule-alert .cell-status,
+.analysis-date.rule-alert { background: var(--dgb); color: var(--dg); border-color: var(--dg); }
+
+/* Totais em uma linha; datas em tabelas separadas por funcionário. */
+.month-summary .analysis-overview-table { min-width: 900px; }
+.month-summary .analysis-overview > th, .month-summary .analysis-overview > td { padding: 14px 12px; vertical-align: middle; background: var(--card); }
+.month-summary .analysis-overview > td { font-size: 14px; font-variant-numeric: tabular-nums; }
+.month-summary .analysis-overview .summary-name { font-size: 13px; }
+.month-summary .analysis-dsr-total { color: var(--tbt); font-weight: 800; }
+.month-summary .analysis-missing, .analysis-reason-alert { color: var(--dg); font-weight: 800; }
+.analysis-state { display: inline-block; padding: 6px 9px; border-radius: 6px; font-size: 11px; white-space: nowrap; }
+.analysis-state.complete { color: var(--fbt); background: var(--fb); }
+.analysis-state.pending { color: var(--dg); background: var(--dgb); }
+.month-summary .analysis-detail-row > td { padding: 0; min-width: 0; background: var(--soft); text-align: left; }
+.employee-analysis > summary { padding: 10px 16px; cursor: pointer; color: var(--navy2); font-size: 11px; font-weight: 650; }
+.employee-analysis > summary:hover { background: var(--tb); }
+.employee-analysis > summary:focus-visible { outline: 3px solid #79a8db; outline-offset: -3px; }
+.analysis-detail-grid { display: grid; grid-template-columns: minmax(220px, .75fr) minmax(0, 1.75fr); gap: 20px; padding: 4px 16px 20px; }
+.analysis-detail-grid section { min-width: 0; }
+.analysis-detail-grid h4 { display: flex; gap: 8px; align-items: center; margin: 8px 0 10px; font-size: 12px; color: var(--navy); }
+.analysis-detail-grid h4 span { padding: 2px 7px; border-radius: 20px; background: var(--bd); font-size: 10px; }
+.analysis-detail-note { margin: -4px 0 10px; color: var(--mut); font-size: 11px; }
+.month-summary .analysis-detail-table { min-width: 0; width: 100%; border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+.month-summary .analysis-detail-table th, .month-summary .analysis-detail-table td { min-width: 0; padding: 9px 10px; text-align: left; font-size: 11px; line-height: 1.5; vertical-align: top; }
+.month-summary .analysis-detail-table th { position: static; background: var(--bd); color: var(--tx); white-space: normal; letter-spacing: 0; text-transform: none; }
+.month-summary .analysis-detail-table td:first-child { width: 84px; white-space: nowrap; }
+.month-summary .analysis-detail-table .analysis-day.rule-alert { color: var(--dg); background: var(--dgb); }
+.month-summary .analysis-detail-table .analysis-empty { padding: 20px; color: var(--mut); font-weight: 400; white-space: normal; }
+@media(max-width:1000px) { .analysis-detail-grid { grid-template-columns: 1fr; gap: 12px; } }

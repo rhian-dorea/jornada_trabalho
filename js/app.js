@@ -1,8 +1,11 @@
+import { analyzeEmployeeMonth } from './employee-month-analysis.js?v=20261125-dsr7';
+import { calendarStatus } from './dsr-date.js?v=20261125-dsr7';
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
-import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261124-1';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr7';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js?v=20261119-2';
-import { summarizeEmployeeMonth } from './monthly-summary.js';
+import { validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr7';
+import { holidayFor } from './holidays.js?v=20261125-dsr7';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -17,11 +20,19 @@ const fd=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+String(d.getFullYear())
 let S={emps:[],rec:{},versions:{},empVersions:{},settings:normalizeSettings()};
 const legacyBrandColors=new Set(['#2457a7','#146e67']);
 let user=null, role=null, mode='m', page='schedule', D=today(), busy=false, loadSeq=0, editId=null, modalReturnFocus=null;
-const st=(id,d)=>(S.rec[id]||{})[key(d)]||'';
-const W=(id,d)=>st(id,d)==='T';
-const restrictionsOn=(e,d)=>st(e.id,d)?[]:workRestrictions(e,d,W,S.settings.regras);
+const rawSt=(id,d)=>(S.rec[id]||{})[key(d)]||'';
+const W=(id,d)=>rawSt(id,d)==='T';
+const restReasonsOn=(e,d)=>W(e.id,d)?[]:[...workRestrictions(e,d,W,S.settings.regras),...weeklyRestRestrictions(e,d,rawSt)];
+const st=(id,d)=>{
+  const status=calendarStatus(rawSt(id,d),d);
+  if(status||!holidayOn(d))return status;
+  const employee=S.emps.find(e=>e.id===id);
+  return employee&&restReasonsOn(employee,d).length?'H':'';
+};
+const restrictionsOn=(e,d)=>st(e.id,d)||holidayOn(d)?[]:[...workRestrictions(e,d,W,S.settings.regras),...weeklyRestRestrictions(e,d,st)];
+const holidayOn=d=>holidayFor(d);
 const warningsOn=(e,d)=>workWarnings(e,d,W,S.settings.regras);
-const check=(e,d)=>validateWork(e,d,W,S.settings.regras);
+const check=(e,d)=>validateMonthlyDsrWork(e,d,W,st)||validate5x2Work(e,d,st)||validateWork(e,d,W,S.settings.regras);
 function toast(m,ok=false){const t=$('#toast');t.style.background=ok?'var(--ok)':'';t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5200)}
 function applyBrand(){
   const s=S.settings;
@@ -45,6 +56,7 @@ function showPage(nextPage){
   if(page==='employees')cfg();
   window.scrollTo({top:0,behavior:'instant'});
 }
+const criticalRest=reasons=>reasons.some(r=>r.kind==='dias'||r.kind==='domingo');
 function info(e,d){
   const c=st(e.id,d);
   if(c==='T'){
@@ -53,7 +65,9 @@ function info(e,d){
     if(assessment.warnings.length)return{c:'exception',t:'⚠ Aviso',detail:assessment.warnings.map(r=>r.short).join(' · ')};
     return{c:'t',t:'● Trabalho',detail:''};
   }
-  if(c==='F')return{c:'f',t:'✓ Folga',detail:''};
+  const reasons=restReasonsOn(e,d),alert=criticalRest(reasons)?' rule-alert':'';
+  if(c==='H'||!c&&holidayOn(d)&&reasons.length)return{c:'h'+alert,t:'◆ Feriado — não soma DSR',detail:reasons.map(r=>r.short).join(' · ')};
+  if(c==='F')return{c:'f'+alert,t:'✓ Folga',detail:reasons.map(r=>r.short).join(' · ')};
   const blocked=restrictionsOn(e,d);
   if(blocked.length)return{c:'blocked',t:'⛔ Descanso obrigatório',detail:blocked.map(r=>r.short).join(' · ')};
   return{c:'z',t:'—',detail:''};
@@ -64,25 +78,33 @@ function colorFor(e){
   let hash=0;for(const ch of String(e.equipe||e.role))hash=(hash*31+ch.charCodeAt(0))>>>0;
   return teamColors[hash%teamColors.length];
 }
-const shortReason=reason=>reason.kind==='dias'?`⚠ ${reason.short.match(/\d+/)?.[0]} dias`:`⚠ ${reason.short.match(/\d+/)?.[0]} dom.`;
+const shortReason=reason=>reason.kind==='semana'?'↻ 5×2':reason.kind==='dias'?`⚠ ${reason.short.match(/\d+/)?.[0]} dias`:`⚠ ${reason.short.match(/\d+/)?.[0]} dom.`;
 function dayGroup(label,list,css){
   if(!list.length)return '';
   const chips=list.map(item=>{
     const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
+    return '<span class="person-chip'+(criticalRest(item.reasons||item.warnings||[])?' rule-alert':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
   return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+'</div></div>';
 }
 function renderMonthSummary(){
   const y=D.getFullYear(),m=D.getMonth(),days=new Date(y,m+1,0).getDate();
   const dates=Array.from({length:days},(_,i)=>new Date(y,m,i+1));
-  const entries=S.emps.filter(e=>e.ativo||dates.some(d=>st(e.id,d))).map(e=>({employee:e,summary:summarizeEmployeeMonth(e,dates,st,restrictionsOn)})).filter(({summary:s})=>s.worked+s.notWorked>0);
-  const title='<div class="month-summary-head"><div><span class="eyebrow">Por funcionário</span><h3>Resumo de '+MN[m].toLocaleLowerCase('pt-BR')+' de '+y+'</h3></div><span class="month-summary-count">'+entries.length+' pessoa'+(entries.length===1?'':'s')+'</span></div>';
-  const note='<p class="month-summary-note">Não trabalhou = Folgas + descansos por dias seguidos + descansos por domingos.</p>';
-  const rows=entries.map(({employee:e,summary:s})=>{
-    return '<tr><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td class="summary-worked">'+s.worked+'</td><td class="summary-not-worked">'+s.notWorked+'</td><td><span class="summary-value off">'+s.off+'</span></td><td><span class="summary-value rest">'+s.restDays+'</span></td><td><span class="summary-value sunday">'+s.restSundays+'</span></td></tr>';
+  const entries=S.emps.filter(e=>e.ativo||dates.some(d=>st(e.id,d))).map(e=>({employee:e,...analyzeEmployeeMonth(e,D,st,restReasonsOn)}));
+  const title='<div class="month-summary-head"><div><span class="eyebrow">Análise individual</span><h3>DSR e feriados · '+MN[m]+' '+y+'</h3></div><span class="month-summary-count">'+entries.length+' funcionários</span></div>';
+  const note='<p class="month-summary-note">Feriado nacional nunca soma DSR, mesmo com Folga, 7 dias ou 2 domingos. Datas sem lançamento não confirmam ausência. Mínimo: 4 DSR até novembro/2026; 9 desde dezembro/2026.</p>';
+  const expanded=new Set([...$('#monthSummary').querySelectorAll('details[open]')].map(el=>el.dataset.analysis));
+  const rows=entries.map(({employee:e,summary:s,dsr,dsrDates,holidays})=>{
+    const detailKey=e.id+'|'+y+'-'+m;
+    const dsrRows=dsrDates.length?dsrDates.map(d=>{
+      const reasons=restReasonsOn(e,d);
+      return '<tr><td class="analysis-day'+(criticalRest(reasons)?' rule-alert':'')+'">'+fd(d)+'</td><td>'+esc(reasons.map(r=>r.short).join(' · ')||'Folga marcada')+'</td></tr>';
+    }).join(''):'<tr><td colspan="2" class="analysis-empty">Nenhum DSR neste mês.</td></tr>';
+    const holidayRows=holidays.length?holidays.map(h=>'<tr><td>'+fd(h.date)+'</td><td>'+esc(h.holiday.nome)+'</td><td>'+esc(h.status==='T'?'Trabalhou':h.status==='H'?'Não trabalhou':'Sem lançamento')+'</td><td class="'+(criticalRest(h.reasons)?'analysis-reason-alert':'')+'">'+esc(h.reasons.map(r=>r.short).join(' · ')||'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="analysis-empty">Nenhum feriado nacional neste mês.</td></tr>';
+    return '<tr class="analysis-overview"><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td>'+s.worked+'</td><td>'+s.notWorked+'</td><td class="analysis-dsr-total">'+dsr.granted+'</td><td>'+dsr.required+'</td><td class="'+(dsr.missing?'analysis-missing':'')+'">'+dsr.missing+'</td><td>'+s.holidayOff+'</td><td><span class="analysis-state '+(dsr.compliant?'complete':'pending')+'">'+(dsr.compliant?'✓ Em dia':'⚠ Pendente')+'</span></td></tr>'+
+      '<tr class="analysis-detail-row"><td colspan="8"><details class="employee-analysis" data-analysis="'+esc(detailKey)+'"'+(expanded.has(detailKey)?' open':'')+'><summary>Consultar datas de '+esc(e.name)+'</summary><div class="analysis-detail-grid"><section><h4>Datas de DSR <span>'+dsr.granted+'</span></h4><table class="analysis-detail-table" aria-label="Datas de DSR de '+esc(e.name)+'"><thead><tr><th scope="col">Data</th><th scope="col">Motivo</th></tr></thead><tbody>'+dsrRows+'</tbody></table></section><section><h4>Feriados nacionais <span>'+holidays.length+'</span></h4><p class="analysis-detail-note">Feriados não entram no total de DSR.</p><table class="analysis-detail-table" aria-label="Feriados de '+esc(e.name)+'"><thead><tr><th scope="col">Data</th><th scope="col">Feriado</th><th scope="col">Situação</th><th scope="col">Motivo do descanso</th></tr></thead><tbody>'+holidayRows+'</tbody></table></section></div></details></td></tr>';
   }).join('');
-  $('#monthSummary').innerHTML=title+note+(entries.length?'<div class="month-summary-scroll" role="region" aria-label="Totais mensais por funcionário" tabindex="0"><table><thead><tr><th scope="col">Funcionário</th><th scope="col">Trabalhou</th><th scope="col">Não trabalhou</th><th scope="col">Folga</th><th scope="col">Descanso após<br>7 dias seguidos</th><th scope="col">Descanso após<br>2 domingos seguidos</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="month-summary-empty">Nenhum funcionário com trabalho, folga ou descanso neste mês.</p>');
+  $('#monthSummary').innerHTML=title+note+(entries.length?'<div class="month-summary-scroll" role="region" aria-label="Resumo mensal por funcionário" tabindex="0"><table class="analysis-overview-table"><thead><tr><th scope="col">Funcionário</th><th scope="col">Trabalhou</th><th scope="col">Não trabalhou</th><th scope="col">DSR</th><th scope="col">Mínimo DSR</th><th scope="col">Faltam</th><th scope="col">Feriados sem<br>trabalho</th><th scope="col">Situação DSR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="month-summary-empty">Nenhum funcionário cadastrado.</p>');
 }
 function render(){
   const t=today();let y=D.getFullYear(),m=D.getMonth(),from,to;
@@ -98,16 +120,16 @@ function render(){
     let h='<div class="cal">'+[1,2,3,4,5,6,0].map(i=>'<div class="h">'+WD[i]+'</div>').join('');
     for(let i=0;i<wks*7;i++){
       const d=add(f,i-mondayOffset(f));
-      const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F');
-      const workEntries=working.map(e=>({employee:e,warnings:warningsOn(e,d)}));
+      const emps=visibleOn(d),working=emps.filter(e=>st(e.id,d)==='T'),off=emps.filter(e=>st(e.id,d)==='F'),holidayOff=emps.filter(e=>st(e.id,d)==='H'||!st(e.id,d)&&holidayOn(d)&&restReasonsOn(e,d).length).map(e=>({employee:e,reasons:restReasonsOn(e,d)}));
+      const workEntries=working.map(e=>({employee:e,warnings:assessWork(e,d,W,S.settings.regras).restrictions}));
       const blocked=emps.filter(e=>st(e.id,d)!=='T').map(e=>({employee:e,reasons:restrictionsOn(e,d)})).filter(x=>x.reasons.length);
       const warnings=workEntries.filter(x=>x.warnings.length).length;
       const cover=coverageGap(d,S.emps,W,S.settings);
-      const holiday=S.settings.feriados.find(x=>x.data===key(d));
-      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+([0,6].includes(d.getDay())?'weekend ':'')+(d.getDay()===0?'s ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
+      const holiday=holidayOn(d);
+      h+='<div class="d '+(d.getMonth()!==m?'o ':'')+([0,6].includes(d.getDay())?'weekend ':'')+(d.getDay()===0?'s ':'')+(holiday?'holiday-day ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
         +(showCoverageAlert(working.length,cover.missing)?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
-        +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">✦ '+esc(holiday.nome)+'</span>':'')
-        +(working.length||off.length||blocked.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off,'off')+dayGroup('⛔ Descanso',blocked,'blocked'):'<span class="day-empty">—</span>')+'</div>';
+        +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">◆ Feriado · '+esc(holiday.nome)+'</span>':'')
+        +(working.length||off.length||blocked.length||holidayOff.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off.map(e=>({employee:e,reasons:restReasonsOn(e,d)})),'off')+dayGroup('⛔ Descanso',blocked,'blocked')+dayGroup('◆ Feriado não trabalhado',holidayOff,'holiday-off'):'<span class="day-empty">—</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{
@@ -116,22 +138,23 @@ function render(){
     const weekEmps=S.emps.filter(e=>e.ativo||Array.from({length:7},(_,i)=>st(e.id,add(s0,i))).some(Boolean));
     let h='<p class="week-hint">Deslize para ver os próximos dias →</p><div class="sc" role="region" aria-label="Escala semanal" tabindex="0"><table><thead><tr><th class="nm" scope="col">Funcionário</th>';
     for(let i=0;i<7;i++){
-      const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length;
+      const d=add(s0,i),count=weekEmps.filter(e=>W(e.id,d)).length,holiday=holidayOn(d);
       const cover=coverageGap(d,S.emps,W,S.settings);
-      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(d.getDay()===0?'sunday-col':'')+'">'+WD[d.getDay()]+'<small>'+fd(d)+'</small><span class="th-count">'+(count?count+' trabalha'+(count===1?'':'m'):'—')+'</span>'+(showCoverageAlert(count,cover.missing)?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
+      h+='<th scope="col" class="'+(+d===+t?'today-col ':'')+(d.getDay()===0?'sunday-col ':'')+(holiday?'holiday-col':'')+'">'+WD[d.getDay()]+'<small>'+fd(d)+'</small>'+(holiday?'<span class="holiday">◆ Feriado · '+esc(holiday.nome)+'</span>':'')+'<span class="th-count">'+(count?count+' trabalha'+(count===1?'':'m'):'—')+'</span>'+(showCoverageAlert(count,cover.missing)?'<span class="th-blocked">⛔ Faltam '+cover.missing+'</span>':'')+'</th>';
     }
     h+='</tr></thead><tbody>';
     if(!weekEmps.length)h+='<tr><td class="empty" colspan="8">Nenhum funcionário corresponde aos filtros desta semana.</td></tr>';
     weekEmps.forEach(e=>{
-      h+='<tr><th scope="row" class="nm employee-row-header"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small></span></th>';
-      for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d);
-        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+'" style="--team-color:'+colorFor(e)+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" title="'+esc(o.detail||o.t)+'" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail.split(' · ').map(x=>x.includes('domingo')?'⚠ '+(x.match(/\d+/)?.[0]||'2')+' dom.':'⚠ '+(x.match(/\d+/)?.[0]||'7')+' dias').join(' '))+'</small>':'')+'</td>'}
+      const dsrWeek=weeklyDsr(e,s0,st,restrictionsOn);
+      h+='<tr><th scope="row" class="nm employee-row-header"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span class="employee-name"><b>'+esc(e.name)+'</b><small>'+esc([e.role,e.ativo?'':'Desativado'].filter(Boolean).join(' · '))+'</small>'+(dsrWeek.required?'<small class="week-dsr '+(dsrWeek.missing?'pending':'complete')+'">'+(dsrWeek.missing?'⚠':'✓')+' DSR semanal '+dsrWeek.granted+'/'+dsrWeek.required+'</small>':'')+'</span></th>';
+      for(let i=0;i<7;i++){const d=add(s0,i),o=info(e,d),holiday=holidayOn(d);
+        h+='<td class="c '+o.c+(+d===+t?' today-col':'')+(holiday?' holiday-col':'')+'" style="--team-color:'+colorFor(e)+'" data-e="'+e.id+'" data-d="'+key(d)+'" tabindex="0" role="button" title="'+esc(o.detail||o.t)+'" aria-label="'+esc(e.name)+' em '+key(d)+': '+esc(o.t)+(o.detail?' · '+esc(o.detail):'')+'"><span class="cell-status">'+o.t+'</span>'+(o.detail?'<small class="cell-detail">'+esc(o.detail.split(' · ').map(x=>x.includes('5×2')?'↻ 5×2':x.includes('domingo')?'⚠ '+(x.match(/\d+/)?.[0]||'2')+' dom.':'⚠ '+(x.match(/\d+/)?.[0]||'7')+' dias').join(' '))+'</small>':'')+'</td>'}
       h+='</tr>';
     });
     h+='</tbody></table></div><div class="week-mobile">';
-    for(let i=0;i<7;i++){const d=add(s0,i),cover=coverageGap(d,S.emps,W,S.settings);
+    for(let i=0;i<7;i++){const d=add(s0,i),holiday=holidayOn(d),cover=coverageGap(d,S.emps,W,S.settings);
       const visibleWorking=weekEmps.filter(e=>W(e.id,d)).length;
-      h+='<section class="mobile-day'+([0,6].includes(d.getDay())?' weekend':'')+'"><h3>'+WD[d.getDay()]+' · '+fd(d)+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
+      h+='<section class="mobile-day'+([0,6].includes(d.getDay())?' weekend':'')+(holiday?' holiday-day':'')+'"><h3>'+WD[d.getDay()]+' · '+fd(d)+(holiday?'<span class="holiday">◆ Feriado · '+esc(holiday.nome)+'</span>':'')+(showCoverageAlert(visibleWorking,cover.missing)?' <span class="coverage-alert">⛔ Faltam '+cover.missing+'</span>':'')+'</h3>'+
         (weekEmps.length?weekEmps.map(e=>{const o=info(e,d);return '<button class="mobile-row" data-e="'+e.id+'" data-d="'+key(d)+'"><span>'+esc(e.name)+'</span><span class="status-pill '+o.c+'">'+esc(o.t)+'</span>'+(o.detail?'<small>'+esc(o.detail)+'</small>':'')+'</button>'}).join(''):'<p class="empty">Nenhum funcionário encontrado.</p>')+'</section>';
     }
     $('#view').innerHTML=h+'</div>';
@@ -186,7 +209,7 @@ async function refresh(){
     role=p.perfil;$('#user').textContent=`${p.nome} · ${p.perfil==='visualizacao'||p.perfil==='funcionario'?'funcionário':p.perfil}`;
     const rec={},versions={};
     for(const r of records){
-      (rec[r.funcionario_id]??={})[r.data]=r.situacao==='trabalho'?'T':'F';
+      (rec[r.funcionario_id]??={})[r.data]=({trabalho:'T',folga:'F',feriado:'H'})[r.situacao]||'';
       versions[`${r.funcionario_id}|${r.data}`]=r.atualizado_em;
     }
     S={emps:emps.map(e=>({...e,name:e.nome,sex:e.sexo,role:canonicalRole(e.cargo)})),rec,versions,settings:normalizeSettings(settings||{}),
@@ -211,11 +234,15 @@ async function setSt(id,ds,v){
   if(v==='F'&&(restrictionsOn(e,date).length||st(id,date)==='T'&&warningsOn(e,date).length)){
     toast('O aviso de descanso ou exceção já aparece na escala; não é necessário lançar Folga neste dia.');return;
   }
+  if(v==='H'){
+    if(!holidayOn(date)){toast('Feriado não cadastrado para esta data.');return}
+    const message=validateMonthlyDsrWork(e,date,W,st)||validate5x2Work(e,date,st,'H');if(message){toast(message);return}
+  }
   if(v==='T'&&st(id,date)!=='T'){
     const message=check(e,date);if(message){toast(message);return}
   }
   if(!v && st(id,fromKey(ds)) && !confirm(`Remover o lançamento de ${e.name} em ${ds}?`))return;
-  await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='T'?'trabalho':v==='F'?'folga':null,
+  await mutate(()=>saveJourney({p_funcionario:id,p_data:ds,p_situacao:v==='F'&&holidayOn(date)?'feriado':({T:'trabalho',F:'folga',H:'feriado'})[v]||null,
     p_versao:S.versions[`${id}|${ds}`]??null}));
 }
 function renderDayRows(ds){
@@ -225,19 +252,21 @@ function renderDayRows(ds){
     const name=e.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
     if(!name.includes(query))return false;
     const c=st(e.id,d);
-    return filter==='all'||filter==='work'&&c==='T'||filter==='off'&&c==='F'||
+    return filter==='all'||filter==='work'&&c==='T'||filter==='off'&&c==='F'||filter==='holiday'&&c==='H'||
       filter==='blocked'&&restrictionsOn(e,d).length>0||filter==='exception'&&c==='T'&&warningsOn(e,d).length>0||filter==='empty'&&!c&&!restrictionsOn(e,d).length;
   }).sort((a,b)=>{
-    const rank=e=>st(e.id,d)==='T'?0:st(e.id,d)==='F'?1:2;
+    const rank=e=>st(e.id,d)==='T'?0:st(e.id,d)==='F'?1:st(e.id,d)==='H'?2:3;
     return rank(a)-rank(b)||a.name.localeCompare(b.name,'pt-BR');
   });
   $('#dB').innerHTML=emps.length?emps.map(e=>{
     const c=st(e.id,d),o=info(e,d),reasons=restrictionsOn(e,d),warnings=c==='T'?warningsOn(e,d):[],bl=reasons[0]?.message||'',can=(role==='gestor'||role==='administrador')&&(e.ativo||c&&role==='administrador');
     const noOff=reasons.length>0||warnings.length>0;
     const meta=[e.role,e.equipe,e.ativo?'':'Desativado'].filter(Boolean).join(' · ');
+    const holidayReasons=holidayOn(d)?restReasonsOn(e,d):[];
+    const holidayNote=holidayReasons.length?'<small class="rule-note">Feriado · 0 DSR · '+esc(holidayReasons.map(r=>r.short).join(' · '))+'</small>':'';
     const restriction=reasons.length?'<small class="rule-note">⛔ Descanso obrigatório: '+esc(reasons.map(r=>r.message).join(' · '))+'</small>':'';
     const warning=warnings.length?'<small class="rule-warning">⚠ Aviso: '+esc(warnings.map(r=>r.message).join(' · '))+'</small>':'';
-    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>Folga</button><button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
+    return '<div class="dr"><div class="person"><span class="av '+e.sex+'">'+esc(e.name.charAt(0).toUpperCase())+'</span><span><b>'+esc(e.name)+'</b><small>'+esc(meta)+'</small>'+restriction+warning+holidayNote+'</span></div><span class="status-pill '+o.c+'">'+o.t+'</span><div class="b"><button class="'+(c==='T'?'on':'')+'" data-s="T" data-e="'+e.id+'"'+(bl?' title="'+esc(bl)+'"':'')+(bl||!can?' disabled':'')+'>Trabalho</button><button class="'+(c==='F'||c==='H'?'onf':'')+'" data-s="F" data-e="'+e.id+'"'+(noOff?' title="Aviso já exibido na escala; Folga indisponível neste dia"':'')+(!can||noOff?' disabled':'')+'>'+'Folga'+'</button>'+'<button class="clear" data-s="" data-e="'+e.id+'"'+(!c||!can?' disabled':'')+'>Remover</button></div></div>';
   }).join(''):'<div class="empty">Nenhum funcionário encontrado para este filtro.</div>';
 }
 function openDay(ds,selectedId){
@@ -249,8 +278,9 @@ function openDay(ds,selectedId){
   $('#ovDay').classList.toggle('single-employee',Boolean(selectedId));
   $('#dT').textContent=(selectedId&&selectedEmployee?selectedEmployee.name+' · ':'')+WD[d.getDay()]+', '+fd(d);
   const working=emps.filter(e=>st(e.id,d)==='T').length,off=emps.filter(e=>st(e.id,d)==='F').length,blocked=emps.filter(e=>restrictionsOn(e,d).length).length;
+  const closed=emps.filter(e=>st(e.id,d)==='H').length;
   const warnings=emps.filter(e=>st(e.id,d)==='T'&&warningsOn(e,d).length).length;
-  $('#dSummary').innerHTML='<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off-blocked)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+' necessário'+(blocked===1?'':'s')+'</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
+  $('#dSummary').innerHTML=(closed?'<span class="summary-holiday">'+closed+' em feriado não trabalhado</span>':'')+'<span class="summary-work">'+working+' trabalhando</span><span class="summary-off">'+off+' de folga</span><span>'+ (emps.length-working-off-blocked-closed)+' sem lançamento</span>'+(blocked?'<span class="summary-blocked">'+blocked+' descanso'+(blocked===1?'':'s')+' necessário'+(blocked===1?'':'s')+'</span>':'')+(warnings?'<span class="summary-warning">'+warnings+' aviso'+(warnings===1?'':'s')+' de exceção</span>':'');
   $('#dB').dataset.d=ds;$('#dB').dataset.employee=selectedId||'';renderDayRows(ds);$('#ovDay').style.display='flex';
   if(opening){const selected=selectedId?$('#dB [data-e="'+selectedId+'"][data-s="T"]:not(:disabled)')||$('#dB [data-e="'+selectedId+'"][data-s="F"]:not(:disabled)'):null;(selected||$('#dSearch')).focus()}
 }

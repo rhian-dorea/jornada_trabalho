@@ -1,5 +1,55 @@
 # Atualizações
 
+## 2026-11-25 — tabela de análise mensal reorganizada
+
+- Resumo principal com uma métrica por coluna: trabalho, ausência, DSR, mínimo, faltantes, feriados sem trabalho e situação.
+- Datas fora das células de totais, em uma área expansível por funcionário; uma data por linha, com colunas de motivo e situação.
+- Detalhes abertos são preservados na atualização automática do mesmo período. Regras e contagem permanecem iguais.
+
+## 2026-11-25 — prioridade visual dos motivos de descanso
+
+- Motivos de dias consecutivos e domingos consecutivos deixam a caixinha vermelha, inclusive Folga ou feriado, no mês, semana e detalhe.
+- Datas da análise com esses motivos também recebem destaque vermelho. Folgas sem esses motivos continuam verdes. Contagem de DSR preservada.
+
+## 2026-11-25 — regras uniformes e análise abaixo do calendário
+
+- Bloqueio de sete dias para todos; bloqueio de dois domingos apenas para mulheres, independentemente do cargo, com verificação entre meses e anos. Migração 010 alinha PostgreSQL.
+- Feriado de descanso mantém o motivo de dias/domingo, mas soma zero DSR. Novas Folgas em feriado são gravadas como feriado.
+- Calendário acima da análise, com datas e totais de DSR e feriados separados por funcionário. Cores dos nomes preservadas.
+- 34 testes JavaScript e testes PostgreSQL de sexo, cargo e virada de mês aprovados.
+
+
+## 2026-11-25 — cor de feriado restrita ao calendário
+
+- As caixinhas de funcionários em folga no feriado voltam ao verde de Folga, inclusive os estados equivalentes na semana e no detalhe. Trabalho e descanso mantêm suas cores habituais.
+- O destaque dourado permanece na célula/cabeçalho do feriado; a contagem de DSR não foi alterada.
+
+## 2026-11-25 — feriado excluído de DSR em qualquer situação
+
+- Regra corrigida conforme orientação mais recente: feriado nacional nunca soma DSR, mesmo marcado como Folga ou com descanso por dias/domingo. Contagem mensal, semanal e resumo usam a mesma exclusão.
+- Folgas antigas em feriados aparecem como feriado não trabalhado sem alterar os registros no banco. Removido o botão de marcação Feriado não trabalhado; continuam Trabalho, Folga e Remover.
+- Limites SQL mensal/semanal também excluem as datas nacionais. Nova migração 009 para instalações que já aplicaram 007/008; aplicar antes de publicar a correção.
+- A nova política substitui a orientação anterior de contar coincidência. É regra interna, não conclusão jurídica universal.
+
+
+## 2026-11-25 — documentação operacional e referências legais
+
+- README reorganizado com índice de guias, uso diário, contagem, transição, implantação, permissões e estrutura dos módulos.
+- Criado guia operacional e legal com exemplos de DSR/feriados, sequência da Lara, lista nacional e referências oficiais consultadas em 25/11/2026.
+- Explicitadas as políticas internas de quatro/nove DSR e dezembro inteiro, as exceções históricas e os controles não implementados. Guias técnicos alinhados à nova documentação.
+- Alterações restritas à documentação; comportamento da aplicação e banco preservados.
+
+
+## 2026-11-25 — DSR mensal, transição 5×2 e feriados nacionais
+
+- Desenvolvimento na branch `codex/dsr-quatro-folgas-mensais`, sem atualização da main ou do banco de produção.
+- Mínimo individual de quatro DSR até novembro/2026 e nove desde dezembro/2026 inteiro, conforme decisão do usuário. Dois DSR por semana a partir de 16/12, incluindo a semana de transição 14–20/12.
+- DSR conta datas distintas de Folga ou descanso automático; feriado sozinho não acrescenta DSR. Novo registro individual de feriado não trabalhado, preservando os registros anteriores.
+- Calendários mensal, semanal e celular mostram somente os feriados nacionais, com cor e nome.
+- Migrações 007 e 008 preparadas e testadas em PostgreSQL 17 descartável, incluindo RPC, inserção, alteração, remoção, meses de tamanhos diferentes, mínimos semanal/mensal e transição. 28 testes JavaScript aprovados.
+- Documentadas as fontes legais e as escolhas internas que não representam limites legais universais.
+
+
 ## 2026-11-24 — separar ciclo exibido e validação de lançamento
 
 - Corrigida a interpretação anterior: o calendário e o resumo mostram o descanso pelo ciclo anterior à data, sem somar trabalhos futuros. Folga e ausência de trabalho interrompem os dias consecutivos.
