@@ -428,9 +428,10 @@ td.exception .cell-status,.status-pill.exception,.day-summary .summary-warning {
 .mobile-day.holiday-day h3 { background: var(--holiday-bg); }
 .holiday { display: block; margin: 4px 0; padding: 4px 6px; border-radius: 5px; background: var(--holiday-bg); color: var(--holiday-text); font-size: 10px; font-weight: 750; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
 .sc tbody td.holiday-col { border-right-color: var(--holiday-text); }
-.day-group.holiday-off .person-chip, .summary-value.holiday-off,
-.status-pill.h, td.h .cell-status, .day-summary .summary-holiday { background: var(--holiday-bg); color: var(--holiday-text); border-color: var(--holiday-text); }
-td.h { background: var(--holiday-bg); }
-.dr .b button.onh { background: var(--holiday-bg); color: var(--holiday-text); border-color: var(--holiday-text); }
-.day-group.holiday-off .group-label, .holiday-legend { color: var(--holiday-text); }
+.day-group.holiday-off .person-chip { background: var(--fb); color: var(--tx); border-color: #d2e8cf; border-left: 3px solid var(--fbt); }
+.status-pill.h, td.h .cell-status { background: var(--fb); color: var(--fbt); }
+td.h { background: var(--fb); }
+.summary-value.holiday-off, .day-summary .summary-holiday { background: var(--holiday-bg); color: var(--holiday-text); }
+.day-group.holiday-off .group-label { color: var(--fbt); }
+.holiday-legend { color: var(--holiday-text); }
 .week-dsr.pending { color: var(--dg); }.week-dsr.complete { color: var(--fbt); }

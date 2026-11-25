@@ -1,5 +1,10 @@
 # Atualizações
 
+## 2026-11-25 — cor de feriado restrita ao calendário
+
+- As caixinhas de funcionários em folga no feriado voltam ao verde de Folga, inclusive os estados equivalentes na semana e no detalhe. Trabalho e descanso mantêm suas cores habituais.
+- O destaque dourado permanece na célula/cabeçalho do feriado; a contagem de DSR não foi alterada.
+
 ## 2026-11-25 — feriado excluído de DSR em qualquer situação
 
 - Regra corrigida conforme orientação mais recente: feriado nacional nunca soma DSR, mesmo marcado como Folga ou com descanso por dias/domingo. Contagem mensal, semanal e resumo usam a mesma exclusão.
