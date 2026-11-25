@@ -1,3 +1,4 @@
+import { uses5x2 } from './schedule-policy.js';
 const next = (date, days) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 const label = date => `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getFullYear()).slice(-2)}`;
 const normalizedTitle = value => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
@@ -24,12 +25,13 @@ export function assessWork(employee, date, isWorking, rules = {}, includeFuture 
   // Avaliar um lançamento considera os dois lados; jornadas existentes usam o ciclo até a data.
   if (includeFuture) while (isWorking(employee.id, next(date, after + 1))) after++;
   const days = before + after + 1;
-  const maxDays = Number(extended ? rules.dias_lideranca ?? 7 : rules.dias ?? 6);
+  const configuredDays = Number(extended ? rules.dias_lideranca ?? 7 : rules.dias ?? 6);
+  const maxDays = uses5x2(date) ? Math.min(6,configuredDays) : configuredDays;
   const maxSundays = Number(extended ? rules.domingos_lideranca ?? 2 : rules.domingos ?? 1);
   if (days > maxDays)
     restrictions.push({ kind: 'dias', short: `${maxDays + 1}º dia seguido`,
       message: `Bloqueado: ${employee.name} teria ${days} dias seguidos de trabalho (inclui ${label(date)}).` });
-  else if (extended && days === maxDays && (!current || before === maxDays - 1))
+  else if (extended && !uses5x2(date) && days === maxDays && (!current || before === maxDays - 1))
     warnings.push({ kind: 'dias', short: `${maxDays}º dia seguido`, message: `Aviso: ${employee.name} trabalha no ${maxDays}º dia consecutivo em ${label(date)}.` });
 
   if (date.getDay() === 0) {

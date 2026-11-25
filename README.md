@@ -6,9 +6,9 @@ Sistema web para planejar jornadas, consultar quem trabalha em cada dia e acompa
 
 1. **Acesso:** o usuário entra com e-mail e senha. A conta precisa existir no Supabase Auth e ter um perfil ativo na tabela `public.perfis`. O sistema não oferece cadastro público de contas.
 2. **Consulta da escala:** em **Escalas**, escolha a visão mensal ou semanal e navegue entre períodos. O mês mostra o nome completo de todas as pessoas em Trabalho, Folga e Descanso obrigatório; as células crescem conforme a equipe. **Hoje** volta ao período atual. Os dias abaixo da cobertura mínima recebem um indicador no próprio calendário.
-3. **Lançamento diário:** clique em um dia do mês para ver todas as pessoas dessa data ou numa célula da semana para ver apenas o funcionário daquela linha. O lançamento oferece **Trabalho**, **Folga** e **Remover**, conforme o perfil de acesso. Nesta versão não há cadastro de horários de jornada.
+3. **Lançamento diário:** clique em um dia do mês para ver todas as pessoas dessa data ou numa célula da semana para ver apenas o funcionário daquela linha. O lançamento oferece **Trabalho**, **Folga**, **Feriado não trabalhado** (nas datas nacionais) e **Remover**, conforme o perfil de acesso. Nesta versão não há cadastro de horários de jornada.
 4. **Funcionários:** consulte a lista, busque por nome, cargo, equipe ou matrícula e filtre ativos/desativados. O administrador pode usar **Novo funcionário**, editar os dados e desativar ou reativar uma pessoa. A desativação preserva as jornadas anteriores.
-5. **Resumo mensal:** acima do calendário, cada funcionário tem totais de Trabalho, Não trabalhou, Folga, Descanso por dias seguidos, Descanso por domingos e seus totais. **Não trabalhou** soma Folga + Descanso após 7 dias seguidos + Descanso após 2 domingos seguidos. Quando uma data tem os dois motivos, ambos entram nessa soma. Pessoas com todos os totais zerados ficam ocultas. A tabela aceita rolagem quando há muitos funcionários.
+5. **Resumo mensal:** mostra o DSR individual, o mínimo exigido e quantas folgas faltam. A meta é 4 até novembro/2026 e 9 desde dezembro/2026 inteiro. Folga e descansos automáticos contam uma vez por data; feriado não trabalhado aparece separado. **Não trabalhou** conta datas distintas, incluindo feriados não trabalhados, sem duplicar descansos com dois motivos. Todos os funcionários ativos aparecem para que as pendências sejam visíveis.
 6. **Sincronização:** após uma gravação, o navegador recarrega os dados do banco. Ele também atualiza a aba visível a cada 60 segundos, ao voltar para ela e quando o usuário clica em **Atualizar**.
 
 A pré-validação no navegador mostra bloqueios e avisos rapidamente. Cada alteração passa novamente pelas funções SQL do banco, que conferem permissões, regras e versão do registro antes de confirmar. Se duas pessoas editarem o mesmo registro, a versão antiga provoca um conflito para revisão em vez de sobrescrever a alteração mais recente.
@@ -18,7 +18,8 @@ A pré-validação no navegador mostra bloqueios e avisos rapidamente. Cada alte
 | Situação | Significado |
 | --- | --- |
 | **Trabalho** | Existe um lançamento de trabalho gravado para a pessoa e o dia. |
-| **Folga** | Existe um lançamento explícito de folga gravado. |
+| **Folga** | Existe um lançamento explícito de folga DSR gravado. |
+| **Feriado não trabalhado ◆** | Registro individual de ausência por feriado; aumenta dias sem trabalho e não soma DSR. |
 | **Descanso obrigatório ⛔** | A escala existente impediria um novo lançamento de trabalho nessa data. É um estado calculado, **não** uma folga gravada automaticamente. |
 | **Aviso ⚠** | Supervisor ou Coordenador está em uma exceção permitida: por padrão, 7º dia seguido ou 2º domingo seguido. O motivo completo fica no detalhe do dia. |
 | **Sem lançamento** | Não há trabalho nem folga registrados, e a data não apresenta bloqueio calculado. |
@@ -33,6 +34,14 @@ Nos dias de descanso necessário ou de exceção, a interface desabilita o botã
 | Supervisor ou Coordenador | O 7º é permitido com aviso vermelho; o 8º é bloqueado. | O 2º é permitido com aviso vermelho; o 3º é bloqueado, independentemente do sexo. |
 
 Esses limites são os **padrões** armazenados no Supabase. As verificações consideram viradas de semana, mês e ano, inclusive lançamentos retroativos. Alterar sexo ou cargo é recusado se isso tornar jornadas existentes inválidas. Veja os detalhes em [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md). Essas regras são requisitos operacionais do sistema; não representam uma verificação completa da legislação trabalhista.
+
+## DSR mensal, escala 5×2 e feriados
+
+A branch acrescenta mínimo mensal para todos os cargos: **4 até novembro/2026; 9 desde dezembro/2026 inteiro**, por decisão da empresa. A partir de **16/12/2026**, cada semana de segunda a domingo deve reservar dois DSR. A semana de transição é 14–20/12; os descansos já existentes nessa semana entram na conta. Novos lançamentos não podem consumir as datas necessárias para completar o mínimo. O indicador continua pendente enquanto as folgas não forem lançadas ou calculadas como descanso obrigatório.
+
+O calendário destaca somente os **feriados nacionais** com cor e nome. Feriado sozinho não cria folga. Se coincidir com DSR, conta um único DSR; caso a empresa feche num dia que seria de trabalho, use **Feriado não trabalhado**, sem aumentar DSR. Veja [regras, fontes e testes de transição](docs/DSR_5X2.md).
+
+O mínimo mensal não substitui os limites semanais, horas e regras de categoria. As exceções antigas de sete dias trabalhados para liderança não se aplicam aos ciclos da nova etapa: todos ficam sujeitos ao máximo de seis dias consecutivos, além dos dois DSR na semana.
 
 ## Perfis de acesso e cargos
 
@@ -52,7 +61,7 @@ Funcionários sem equipe aparecem apenas para o administrador até receberem uma
 
 **Pré-requisitos:** projeto Supabase, servidor HTTP local (Python ou equivalente) e Node.js apenas para executar os testes. Não há etapa de compilação nem dependências npm obrigatórias para abrir a aplicação.
 
-1. Siga [Configuração do Supabase](docs/CONFIGURACAO_SUPABASE.md). Em projeto novo, execute os scripts `sql/001_schema.sql` a `sql/006_configuracoes_empresa.sql` **na ordem numérica**. Em projeto existente, execute apenas os scripts novos que faltam. Faça backup antes da migração. Colocar os arquivos no repositório não os executa no banco.
+1. Siga [Configuração do Supabase](docs/CONFIGURACAO_SUPABASE.md). Em projeto novo, execute os scripts `sql/001_schema.sql` a `sql/008_feriado_nao_trabalhado.sql` **na ordem numérica**. Em projeto existente, execute apenas os scripts novos que faltam. Faça backup antes da migração. Colocar os arquivos no repositório não os executa no banco.
 2. Em [`js/config.js`](js/config.js), informe a URL e a **chave publicável** do projeto. O arquivo já contém valores públicos de uma instalação; substitua-os ao configurar outra. Nunca coloque `service_role`, senha do banco ou outro segredo no frontend.
 3. Crie o primeiro usuário no Supabase Auth e seu perfil `administrador` em `public.perfis`. Configure os perfis e as equipes dos demais usuários conforme o guia.
 4. Na raiz do repositório, inicie um servidor HTTP:
@@ -102,7 +111,7 @@ Eles cobrem regras de escala, limites configuráveis, cobertura, CSV e migraçã
 | `js/app.js`, `js/calendar-state.js`, `js/monthly-summary.js`, `js/rules.js`, `js/settings.js` | Navegação, calendário, resumo mensal, regras, cobertura e configurações. |
 | `js/data.js`, `js/config.js` | Comunicação com Supabase e configuração pública. |
 | `js/csv.js`, `js/migration.js` | Utilitários de CSV e migração local, sem controles na interface atual. |
-| `sql/001_schema.sql` a `sql/006_configuracoes_empresa.sql` | Tabelas, segurança, funções transacionais, regras, cargos e configurações. |
+| `sql/001_schema.sql` a `sql/008_feriado_nao_trabalhado.sql` | Tabelas, segurança, funções transacionais, regras, cargos e configurações. |
 | `tests/`, `docs/` | Testes, matriz de homologação e documentação de instalação e operação. |
 
 O arquivo original `Controle_de_Escalas_e_DSR.html` permanece apenas no workspace e é ignorado pelo Git porque contém dados de demonstração.

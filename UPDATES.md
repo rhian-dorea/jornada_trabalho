@@ -1,5 +1,15 @@
 # Atualizações
 
+## 2026-11-25 — DSR mensal, transição 5×2 e feriados nacionais
+
+- Desenvolvimento na branch `codex/dsr-quatro-folgas-mensais`, sem atualização da main ou do banco de produção.
+- Mínimo individual de quatro DSR até novembro/2026 e nove desde dezembro/2026 inteiro, conforme decisão do usuário. Dois DSR por semana a partir de 16/12, incluindo a semana de transição 14–20/12.
+- DSR conta datas distintas de Folga ou descanso automático; feriado sozinho não acrescenta DSR. Novo registro individual de feriado não trabalhado, preservando os registros anteriores.
+- Calendários mensal, semanal e celular mostram somente os feriados nacionais, com cor e nome.
+- Migrações 007 e 008 preparadas e testadas em PostgreSQL 17 descartável, incluindo RPC, inserção, alteração, remoção, meses de tamanhos diferentes, mínimos semanal/mensal e transição. 28 testes JavaScript aprovados.
+- Documentadas as fontes legais e as escolhas internas que não representam limites legais universais.
+
+
 ## 2026-11-24 — separar ciclo exibido e validação de lançamento
 
 - Corrigida a interpretação anterior: o calendário e o resumo mostram o descanso pelo ciclo anterior à data, sem somar trabalhos futuros. Folga e ausência de trabalho interrompem os dias consecutivos.

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Controle de Escalas e DSR</title>
 <link rel="icon" type="image/svg+xml" href="./assets/mark.svg">
-<link rel="stylesheet" href="./css/style.css?v=20261124-1">
+<link rel="stylesheet" href="./css/style.css?v=20261124-dsr1">
 </head>
 <body>
 <header>
@@ -25,7 +25,7 @@
     </div>
     <div class="period-bar"><div class="nav"><button id="pv" aria-label="Período anterior">‹</button><strong id="ttl"></strong><button id="nx" aria-label="Próximo período">›</button><button id="td">Hoje</button></div></div>
     <section id="monthSummary" class="month-summary" aria-label="Resumo mensal por funcionário"></section>
-    <div class="lg" aria-label="Legenda"><span class="lg-work">● Trabalho</span><span class="lg-off">✓ Folga</span><span class="lg-blocked">⛔ Descanso obrigatório</span><span class="lg-warning">⚠ Aviso</span><span>— Sem lançamento</span></div>
+    <div class="lg" aria-label="Legenda"><span class="lg-work">● Trabalho</span><span class="lg-off">✓ Folga</span><span class="lg-blocked">⛔ Descanso obrigatório</span><span class="lg-warning">⚠ Aviso</span><span class="holiday-legend">◆ Feriado</span><span>— Sem lançamento</span></div>
     <div id="view"></div>
     </section>
   </div>
@@ -38,12 +38,12 @@
   </section>
 </main>
 
-<div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div class="day-tools"><div><label for="dSearch">Buscar funcionário</label><input id="dSearch" type="search" placeholder="Digite um nome" autocomplete="off"></div><div><label for="dFilter">Mostrar</label><select id="dFilter"><option value="all">Todos</option><option value="work">Trabalho</option><option value="off">Folga</option><option value="blocked">Descanso obrigatório</option><option value="exception">Avisos</option><option value="empty">Sem lançamento</option></select></div></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
+<div class="ov" id="ovDay"><div class="box day-box" role="dialog" aria-modal="true" aria-labelledby="dT"><div class="modal-heading"><div><span class="eyebrow">Lançamentos do dia</span><h2 id="dT"></h2></div><button class="icon-button" data-close="ovDay" aria-label="Fechar">×</button></div><div id="dSummary" class="day-summary"></div><div class="day-tools"><div><label for="dSearch">Buscar funcionário</label><input id="dSearch" type="search" placeholder="Digite um nome" autocomplete="off"></div><div><label for="dFilter">Mostrar</label><select id="dFilter"><option value="all">Todos</option><option value="work">Trabalho</option><option value="off">Folga</option><option value="holiday">Feriado não trabalhado</option><option value="blocked">Descanso obrigatório</option><option value="exception">Avisos</option><option value="empty">Sem lançamento</option></select></div></div><div id="dB"></div><div class="modal-footer"><button data-close="ovDay">Fechar</button></div></div></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
 <div class="ov" id="ovLogin" style="display:flex"><form class="box" id="loginForm"><h2>Acessar Controle de Escalas</h2><p>Entre com sua conta autorizada.</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><div style="display:flex;gap:8px;margin-top:14px"><button class="p" type="submit" id="bLogin">Entrar</button><button type="button" id="bReset">Recuperar senha</button></div><p id="loginError" role="alert"></p></form></div>
 <div class="ov" id="ovPassword"><form class="box" id="passwordForm"><h2>Definir nova senha</h2><label for="newPassword">Nova senha</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" required><div style="margin-top:14px"><button class="p" type="submit">Salvar senha</button></div><p id="passwordError" role="alert"></p></form></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-<script type="module" src="./js/app.js?v=20261124-1"></script>
+<script type="module" src="./js/app.js?v=20261124-dsr1"></script>
 </body>
 </html>
