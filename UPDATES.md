@@ -1,5 +1,10 @@
 # Atualizações
 
+## 2026-11-25 — prioridade visual dos motivos de descanso
+
+- Motivos de dias consecutivos e domingos consecutivos deixam a caixinha vermelha, inclusive Folga ou feriado, no mês, semana e detalhe.
+- Datas da análise com esses motivos também recebem destaque vermelho. Folgas sem esses motivos continuam verdes. Contagem de DSR preservada.
+
 ## 2026-11-25 — regras uniformes e análise abaixo do calendário
 
 - Bloqueio de sete dias para todos; bloqueio de dois domingos apenas para mulheres, independentemente do cargo, com verificação entre meses e anos. Migração 010 alinha PostgreSQL.

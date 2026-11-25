@@ -1,11 +1,11 @@
-import { analyzeEmployeeMonth } from './employee-month-analysis.js?v=20261125-dsr5';
-import { calendarStatus } from './dsr-date.js?v=20261125-dsr5';
+import { analyzeEmployeeMonth } from './employee-month-analysis.js?v=20261125-dsr6';
+import { calendarStatus } from './dsr-date.js?v=20261125-dsr6';
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
-import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr5';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr6';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js?v=20261119-2';
-import { validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr5';
-import { holidayFor } from './holidays.js?v=20261125-dsr5';
+import { validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr6';
+import { holidayFor } from './holidays.js?v=20261125-dsr6';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -56,6 +56,7 @@ function showPage(nextPage){
   if(page==='employees')cfg();
   window.scrollTo({top:0,behavior:'instant'});
 }
+const criticalRest=reasons=>reasons.some(r=>r.kind==='dias'||r.kind==='domingo');
 function info(e,d){
   const c=st(e.id,d);
   if(c==='T'){
@@ -64,8 +65,9 @@ function info(e,d){
     if(assessment.warnings.length)return{c:'exception',t:'⚠ Aviso',detail:assessment.warnings.map(r=>r.short).join(' · ')};
     return{c:'t',t:'● Trabalho',detail:''};
   }
-  if(c==='H'||!c&&holidayOn(d)&&restReasonsOn(e,d).length)return{c:'h',t:'◆ Feriado — não soma DSR',detail:restReasonsOn(e,d).map(r=>r.short).join(' · ')};
-  if(c==='F')return{c:'f',t:'✓ Folga',detail:restReasonsOn(e,d).map(r=>r.short).join(' · ')};
+  const reasons=restReasonsOn(e,d),alert=criticalRest(reasons)?' rule-alert':'';
+  if(c==='H'||!c&&holidayOn(d)&&reasons.length)return{c:'h'+alert,t:'◆ Feriado — não soma DSR',detail:reasons.map(r=>r.short).join(' · ')};
+  if(c==='F')return{c:'f'+alert,t:'✓ Folga',detail:reasons.map(r=>r.short).join(' · ')};
   const blocked=restrictionsOn(e,d);
   if(blocked.length)return{c:'blocked',t:'⛔ Descanso obrigatório',detail:blocked.map(r=>r.short).join(' · ')};
   return{c:'z',t:'—',detail:''};
@@ -81,7 +83,7 @@ function dayGroup(label,list,css){
   if(!list.length)return '';
   const chips=list.map(item=>{
     const e=item.employee||item,reason=(item.reasons||item.warnings)?.map(r=>r.short).join(' · '),short=(item.reasons||item.warnings)?.map(shortReason).join(' ');
-    return '<span class="person-chip'+(item.warnings?.length?' warning':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
+    return '<span class="person-chip'+(criticalRest(item.reasons||item.warnings||[])?' rule-alert':'')+'" style="--team-color:'+colorFor(e)+'" title="'+esc(e.name+(reason?' · '+reason:''))+'" aria-label="'+esc(e.name+(reason?' · '+reason:''))+'">'+esc(e.name)+(short?'<em>'+esc(short)+'</em>':'')+'</span>';
   }).join('');
   return '<div class="day-group '+css+'"><span class="group-label">'+label+' · '+list.length+'</span><div class="people">'+chips+'</div></div>';
 }
@@ -92,7 +94,7 @@ function renderMonthSummary(){
   const title='<div class="month-summary-head"><div><span class="eyebrow">Análise individual</span><h3>DSR e feriados · '+MN[m]+' '+y+'</h3></div><span class="month-summary-count">'+entries.length+' funcionários</span></div>';
   const note='<p class="month-summary-note">Feriado nacional nunca soma DSR, mesmo com Folga, 7 dias ou 2 domingos. Datas sem lançamento não confirmam ausência. Mínimo: 4 DSR até novembro/2026; 9 desde dezembro/2026.</p>';
   const rows=entries.map(({employee:e,summary:s,dsr,dsrDates,holidays})=>{
-    const dsrList=dsrDates.length?dsrDates.map(d=>'<span class="analysis-date">'+fd(d)+'</span>').join(''):'—';
+    const dsrList=dsrDates.length?dsrDates.map(d=>'<span class="analysis-date'+(criticalRest(restReasonsOn(e,d))?' rule-alert':'')+'" title="'+esc(restReasonsOn(e,d).map(r=>r.short).join(' · '))+'">'+fd(d)+'</span>').join(''):'—';
     const holidayList=holidays.length?holidays.map(h=>'<li><b>'+fd(h.date)+'</b> · '+esc(h.holiday.nome)+'<small>'+esc(h.status==='T'?'Trabalhou':h.status==='H'?'Feriado não trabalhado · 0 DSR':'Sem lançamento · 0 DSR')+(h.reasons.length?' · '+esc(h.reasons.map(r=>r.short).join(' · ')):'')+'</small></li>').join(''):'<li>—</li>';
     return '<tr><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td><span class="dsr-status '+(dsr.compliant?'complete':'pending')+'">'+dsr.granted+'/'+dsr.required+'<small>'+(dsr.compliant?'✓ Mínimo atendido':'⚠ Faltam '+dsr.missing)+'</small></span><div class="analysis-dates">'+dsrList+'</div></td><td>'+s.worked+'</td><td>'+s.notWorked+'</td><td><b>'+s.holidayOff+' sem trabalho</b><small>'+holidays.length+' feriados no mês · 0 DSR</small><ul class="analysis-holidays">'+holidayList+'</ul></td></tr>';
   }).join('');
@@ -121,7 +123,7 @@ function render(){
       h+='<div class="d '+(d.getMonth()!==m?'o ':'')+([0,6].includes(d.getDay())?'weekend ':'')+(d.getDay()===0?'s ':'')+(holiday?'holiday-day ':'')+(+d===+t?'t':'')+'" data-day="'+key(d)+'" tabindex="0" role="button" aria-label="Abrir dia '+key(d)+': '+working.length+' trabalhando, '+off.length+' de folga, '+blocked.length+' com descanso necessário, '+warnings+' avisos de exceção"><div class="day-head"><span class="n">'+d.getDate()+'</span><span class="weekday">'+WD[d.getDay()]+'</span></div>'
         +(showCoverageAlert(working.length,cover.missing)?'<span class="coverage-alert" title="Cobertura mínima: '+cover.minimum+' · Trabalhando: '+cover.count+'">⛔ Faltam '+cover.missing+'</span>':'')
         +(holiday?'<span class="holiday" title="'+esc(holiday.nome)+'">◆ Feriado · '+esc(holiday.nome)+'</span>':'')
-        +(working.length||off.length||blocked.length||holidayOff.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off,'off')+dayGroup('⛔ Descanso',blocked,'blocked')+dayGroup('◆ Feriado não trabalhado',holidayOff,'holiday-off'):'<span class="day-empty">—</span>')+'</div>';
+        +(working.length||off.length||blocked.length||holidayOff.length?dayGroup('● Trabalho',workEntries,'work')+dayGroup('✓ Folga',off.map(e=>({employee:e,reasons:restReasonsOn(e,d)})),'off')+dayGroup('⛔ Descanso',blocked,'blocked')+dayGroup('◆ Feriado não trabalhado',holidayOff,'holiday-off'):'<span class="day-empty">—</span>')+'</div>';
     }
     $('#view').innerHTML=h+'</div>';
   }else{

@@ -443,3 +443,7 @@ td.h { background: var(--fb); }
 .analysis-holidays li { margin: 6px 0; line-height: 1.5; }
 .analysis-holidays small, .month-summary td > small { display: block; color: var(--mut); margin-top: 3px; }
 .month-summary td { vertical-align: top; }
+/* Motivos de dias/domingo têm prioridade sobre as cores de Folga e feriado. */
+.day-group .person-chip.rule-alert,
+.status-pill.rule-alert, td.rule-alert, td.rule-alert .cell-status,
+.analysis-date.rule-alert { background: var(--dgb); color: var(--dg); border-color: var(--dg); }
