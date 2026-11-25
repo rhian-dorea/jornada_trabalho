@@ -1,5 +1,13 @@
 # Atualizações
 
+## 2026-11-25 — documentação operacional e referências legais
+
+- README reorganizado com índice de guias, uso diário, contagem, transição, implantação, permissões e estrutura dos módulos.
+- Criado guia operacional e legal com exemplos de DSR/feriados, sequência da Lara, lista nacional e referências oficiais consultadas em 25/11/2026.
+- Explicitadas as políticas internas de quatro/nove DSR e dezembro inteiro, as exceções históricas e os controles não implementados. Guias técnicos alinhados à nova documentação.
+- Alterações restritas à documentação; comportamento da aplicação e banco preservados.
+
+
 ## 2026-11-25 — DSR mensal, transição 5×2 e feriados nacionais
 
 - Desenvolvimento na branch `codex/dsr-quatro-folgas-mensais`, sem atualização da main ou do banco de produção.

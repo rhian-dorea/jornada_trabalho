@@ -1,4 +1,6 @@
-# DSR, transição e feriados — branch de desenvolvimento
+# DSR, transição e feriados — implementação
+
+Para conceitos, exemplos e análise das referências, consulte o [Guia operacional e legal](GUIA_OPERACIONAL_E_LEGAL.md). Este arquivo detalha a política da branch e sua validação.
 
 ## Política definida pela empresa
 
