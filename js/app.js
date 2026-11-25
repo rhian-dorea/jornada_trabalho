@@ -1,11 +1,11 @@
-import { analyzeEmployeeMonth } from './employee-month-analysis.js?v=20261125-dsr6';
-import { calendarStatus } from './dsr-date.js?v=20261125-dsr6';
+import { analyzeEmployeeMonth } from './employee-month-analysis.js?v=20261125-dsr7';
+import { calendarStatus } from './dsr-date.js?v=20261125-dsr7';
 import { db, configured, profile, employees, journeys, saveEmployee, saveJourney, companySettings } from './data.js';
-import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr6';
+import { validateWork, assessWork, workRestrictions, workWarnings, canonicalRole } from './rules.js?v=20261125-dsr7';
 import { defaults, normalizeSettings, coverageGap } from './settings.js';
 import { dayPeople, showCoverageAlert, mondayOffset } from './calendar-state.js?v=20261119-2';
-import { validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr6';
-import { holidayFor } from './holidays.js?v=20261125-dsr6';
+import { validateMonthlyDsrWork, validate5x2Work, weeklyDsr, weeklyRestRestrictions } from './monthly-dsr.js?v=20261125-dsr7';
+import { holidayFor } from './holidays.js?v=20261125-dsr7';
 
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, '0');
@@ -93,12 +93,18 @@ function renderMonthSummary(){
   const entries=S.emps.filter(e=>e.ativo||dates.some(d=>st(e.id,d))).map(e=>({employee:e,...analyzeEmployeeMonth(e,D,st,restReasonsOn)}));
   const title='<div class="month-summary-head"><div><span class="eyebrow">Análise individual</span><h3>DSR e feriados · '+MN[m]+' '+y+'</h3></div><span class="month-summary-count">'+entries.length+' funcionários</span></div>';
   const note='<p class="month-summary-note">Feriado nacional nunca soma DSR, mesmo com Folga, 7 dias ou 2 domingos. Datas sem lançamento não confirmam ausência. Mínimo: 4 DSR até novembro/2026; 9 desde dezembro/2026.</p>';
+  const expanded=new Set([...$('#monthSummary').querySelectorAll('details[open]')].map(el=>el.dataset.analysis));
   const rows=entries.map(({employee:e,summary:s,dsr,dsrDates,holidays})=>{
-    const dsrList=dsrDates.length?dsrDates.map(d=>'<span class="analysis-date'+(criticalRest(restReasonsOn(e,d))?' rule-alert':'')+'" title="'+esc(restReasonsOn(e,d).map(r=>r.short).join(' · '))+'">'+fd(d)+'</span>').join(''):'—';
-    const holidayList=holidays.length?holidays.map(h=>'<li><b>'+fd(h.date)+'</b> · '+esc(h.holiday.nome)+'<small>'+esc(h.status==='T'?'Trabalhou':h.status==='H'?'Feriado não trabalhado · 0 DSR':'Sem lançamento · 0 DSR')+(h.reasons.length?' · '+esc(h.reasons.map(r=>r.short).join(' · ')):'')+'</small></li>').join(''):'<li>—</li>';
-    return '<tr><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td><span class="dsr-status '+(dsr.compliant?'complete':'pending')+'">'+dsr.granted+'/'+dsr.required+'<small>'+(dsr.compliant?'✓ Mínimo atendido':'⚠ Faltam '+dsr.missing)+'</small></span><div class="analysis-dates">'+dsrList+'</div></td><td>'+s.worked+'</td><td>'+s.notWorked+'</td><td><b>'+s.holidayOff+' sem trabalho</b><small>'+holidays.length+' feriados no mês · 0 DSR</small><ul class="analysis-holidays">'+holidayList+'</ul></td></tr>';
+    const detailKey=e.id+'|'+y+'-'+m;
+    const dsrRows=dsrDates.length?dsrDates.map(d=>{
+      const reasons=restReasonsOn(e,d);
+      return '<tr><td class="analysis-day'+(criticalRest(reasons)?' rule-alert':'')+'">'+fd(d)+'</td><td>'+esc(reasons.map(r=>r.short).join(' · ')||'Folga marcada')+'</td></tr>';
+    }).join(''):'<tr><td colspan="2" class="analysis-empty">Nenhum DSR neste mês.</td></tr>';
+    const holidayRows=holidays.length?holidays.map(h=>'<tr><td>'+fd(h.date)+'</td><td>'+esc(h.holiday.nome)+'</td><td>'+esc(h.status==='T'?'Trabalhou':h.status==='H'?'Não trabalhou':'Sem lançamento')+'</td><td class="'+(criticalRest(h.reasons)?'analysis-reason-alert':'')+'">'+esc(h.reasons.map(r=>r.short).join(' · ')||'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="analysis-empty">Nenhum feriado nacional neste mês.</td></tr>';
+    return '<tr class="analysis-overview"><th scope="row"><span class="summary-name">'+esc(e.name)+'</span><small>'+esc([e.role,e.equipe].filter(Boolean).join(' · '))+'</small></th><td>'+s.worked+'</td><td>'+s.notWorked+'</td><td class="analysis-dsr-total">'+dsr.granted+'</td><td>'+dsr.required+'</td><td class="'+(dsr.missing?'analysis-missing':'')+'">'+dsr.missing+'</td><td>'+s.holidayOff+'</td><td><span class="analysis-state '+(dsr.compliant?'complete':'pending')+'">'+(dsr.compliant?'✓ Em dia':'⚠ Pendente')+'</span></td></tr>'+
+      '<tr class="analysis-detail-row"><td colspan="8"><details class="employee-analysis" data-analysis="'+esc(detailKey)+'"'+(expanded.has(detailKey)?' open':'')+'><summary>Consultar datas de '+esc(e.name)+'</summary><div class="analysis-detail-grid"><section><h4>Datas de DSR <span>'+dsr.granted+'</span></h4><table class="analysis-detail-table" aria-label="Datas de DSR de '+esc(e.name)+'"><thead><tr><th scope="col">Data</th><th scope="col">Motivo</th></tr></thead><tbody>'+dsrRows+'</tbody></table></section><section><h4>Feriados nacionais <span>'+holidays.length+'</span></h4><p class="analysis-detail-note">Feriados não entram no total de DSR.</p><table class="analysis-detail-table" aria-label="Feriados de '+esc(e.name)+'"><thead><tr><th scope="col">Data</th><th scope="col">Feriado</th><th scope="col">Situação</th><th scope="col">Motivo do descanso</th></tr></thead><tbody>'+holidayRows+'</tbody></table></section></div></details></td></tr>';
   }).join('');
-  $('#monthSummary').innerHTML=title+note+(entries.length?'<div class="month-summary-scroll" role="region" aria-label="Datas individuais de DSR e feriados" tabindex="0"><table><thead><tr><th scope="col">Funcionário</th><th scope="col">Total e datas de DSR</th><th scope="col">Trabalhou</th><th scope="col">Não trabalhou</th><th scope="col">Total e datas de feriados</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="month-summary-empty">Nenhum funcionário cadastrado.</p>');
+  $('#monthSummary').innerHTML=title+note+(entries.length?'<div class="month-summary-scroll" role="region" aria-label="Resumo mensal por funcionário" tabindex="0"><table class="analysis-overview-table"><thead><tr><th scope="col">Funcionário</th><th scope="col">Trabalhou</th><th scope="col">Não trabalhou</th><th scope="col">DSR</th><th scope="col">Mínimo DSR</th><th scope="col">Faltam</th><th scope="col">Feriados sem<br>trabalho</th><th scope="col">Situação DSR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="month-summary-empty">Nenhum funcionário cadastrado.</p>');
 }
 function render(){
   const t=today();let y=D.getFullYear(),m=D.getMonth(),from,to;

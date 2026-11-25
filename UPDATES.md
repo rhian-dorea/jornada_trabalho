@@ -1,5 +1,11 @@
 # Atualizações
 
+## 2026-11-25 — tabela de análise mensal reorganizada
+
+- Resumo principal com uma métrica por coluna: trabalho, ausência, DSR, mínimo, faltantes, feriados sem trabalho e situação.
+- Datas fora das células de totais, em uma área expansível por funcionário; uma data por linha, com colunas de motivo e situação.
+- Detalhes abertos são preservados na atualização automática do mesmo período. Regras e contagem permanecem iguais.
+
 ## 2026-11-25 — prioridade visual dos motivos de descanso
 
 - Motivos de dias consecutivos e domingos consecutivos deixam a caixinha vermelha, inclusive Folga ou feriado, no mês, semana e detalhe.
