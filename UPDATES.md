@@ -1,5 +1,12 @@
 # Atualizações
 
+## 2026-11-27 — compatibilidade com banco sem empresa_id
+
+- Corrigida a validação 010 que exigia `funcionarios.empresa_id` e `empresas`, mesmo em instalações anteriores à migração multiempresa.
+- Migração 011 usa campos opcionais por JSON e preserva a interjornada configurada quando disponível; sem horários, verifica as regras de dias/domingo normalmente.
+- Limpeza de horários em Folga/Feriado também funciona quando essas colunas não existem. Nenhum funcionário ou jornada é regravado pela migração.
+- Testado em PostgreSQL 17 descartável, com e sem empresa_id/empresas/horários, incluindo Trabalho, Folga, Feriado, Remover, sete dias, dois domingos e interjornada configurada.
+
 ## 2026-11-25 — tabela de análise mensal reorganizada
 
 - Resumo principal com uma métrica por coluna: trabalho, ausência, DSR, mínimo, faltantes, feriados sem trabalho e situação.

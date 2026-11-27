@@ -1,5 +1,11 @@
 # Configuração do Supabase
 
+## Correção de erro `column "empresa_id" does not exist`
+
+Se os scripts 007–010 já foram aplicados, mas gravar uma jornada apresenta esse erro, execute **somente `sql/011_compatibilidade_banco_legado.sql`**, inteiro, no SQL Editor. Ele corrige funções para funcionar com ou sem a estrutura opcional de empresa/horários. Não adiciona colunas, não troca de banco e não regrava funcionários ou jornadas. Depois, atualize o site e repita a operação. Não é necessário reaplicar os scripts de criação de tabelas para resolver esse erro.
+
+O teste `tests/legacy_schema_compat.sql` é exclusivo para banco descartável e não deve ser executado em produção.
+
 1. Crie uma conta em [Supabase](https://supabase.com/dashboard) e escolha **New project**. Escolha organização, nome, região e senha forte do banco. Guarde essa senha fora do repositório.
 2. Após a criação, abra **Project Settings → API Keys**. Copie a **Project URL** e a **publishable key** (`sb_publishable_...`). Em instalações com painel antigo, a chave `anon` pública pode existir, mas prefira a publicável. Jamais copie `secret`, `service_role`, senha do banco ou token de usuário para o código.
 3. Edite somente `js/config.js`: defina `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` como strings. Esses valores são públicos; a segurança dos dados depende das políticas do banco.
